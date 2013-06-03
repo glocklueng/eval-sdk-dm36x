@@ -1,0 +1,1159 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/Makefile	2011-03-24 18:27:31.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/Makefile	2011-10-14 10:20:19.177943251 -0600
+@@ -10,7 +10,8 @@
+ 
+ omap2cam-objs	:=	omap24xxcam.o omap24xxcam-dma.o
+ 
+-videodev-objs	:=	v4l2-dev.o v4l2-ioctl.o v4l2-device.o
++videodev-objs	:=	v4l2-dev.o v4l2-ioctl.o v4l2-device.o v4l2-fh.o \
++			v4l2-event.o
+ 
+ # V4L2 core modules
+ 
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-fh.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-fh.c	2011-10-14 10:20:19.177943251 -0600
+@@ -0,0 +1,79 @@
++/*
++ * v4l2-fh.c
++ *
++ * V4L2 file handles.
++ *
++ * Copyright (C) 2009--2010 Nokia Corporation.
++ *
++ * Contact: Sakari Ailus <sakari.ailus@maxwell.research.nokia.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ */
++
++#include <linux/bitops.h>
++#include <media/v4l2-dev.h>
++#include <media/v4l2-fh.h>
++#include <media/v4l2-event.h>
++#include <media/v4l2-ioctl.h>
++
++int v4l2_fh_init(struct v4l2_fh *fh, struct video_device *vdev)
++{
++	fh->vdev = vdev;
++	INIT_LIST_HEAD(&fh->list);
++	set_bit(V4L2_FL_USES_V4L2_FH, &fh->vdev->flags);
++
++	/*
++	 * fh->events only needs to be initialized if the driver
++	 * supports the VIDIOC_SUBSCRIBE_EVENT ioctl.
++	 */
++	if (vdev->ioctl_ops && vdev->ioctl_ops->vidioc_subscribe_event)
++		return v4l2_event_init(fh);
++	else
++		fh->events = NULL;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(v4l2_fh_init);
++
++void v4l2_fh_add(struct v4l2_fh *fh)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&fh->vdev->fh_lock, flags);
++	list_add(&fh->list, &fh->vdev->fh_list);
++	spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
++}
++EXPORT_SYMBOL_GPL(v4l2_fh_add);
++
++void v4l2_fh_del(struct v4l2_fh *fh)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&fh->vdev->fh_lock, flags);
++	list_del_init(&fh->list);
++	spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
++}
++EXPORT_SYMBOL_GPL(v4l2_fh_del);
++
++void v4l2_fh_exit(struct v4l2_fh *fh)
++{
++	if (fh->vdev == NULL)
++		return;
++
++	fh->vdev = NULL;
++
++	v4l2_event_free(fh);
++}
++EXPORT_SYMBOL_GPL(v4l2_fh_exit);
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-dev.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-dev.h	2011-03-24 18:27:35.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-dev.h	2011-10-14 10:20:19.177943251 -0600
+@@ -32,6 +32,7 @@
+    Drivers can set this flag if they want to block all future
+    device access. It is set by video_unregister_device. */
+ #define V4L2_FL_UNREGISTERED	(0)
++#define V4L2_FL_USES_V4L2_FH	(1)
+ 
+ struct v4l2_file_operations {
+ 	struct module *owner;
+@@ -77,6 +78,10 @@
+ 	/* attribute to differentiate multiple indices on one physical device */
+ 	int index;
+ 
++	/* V4L2 file handles */
++	spinlock_t		fh_lock; /* Lock for all v4l2_fhs */
++	struct list_head	fh_list; /* List of struct v4l2_fh */
++
+ 	int debug;			/* Activates debug level*/
+ 
+ 	/* Video standard vars */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-fh.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-fh.h	2011-10-14 10:20:19.177943251 -0600
+@@ -0,0 +1,44 @@
++/*
++ * v4l2-fh.h
++ *
++ * V4L2 file handle.
++ *
++ * Copyright (C) 2009--2010 Nokia Corporation.
++ *
++ * Contact: Sakari Ailus <sakari.ailus@maxwell.research.nokia.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ */
++
++#ifndef V4L2_FH_H
++#define V4L2_FH_H
++
++#include <linux/list.h>
++
++struct video_device;
++struct v4l2_events;
++
++struct v4l2_fh {
++	struct list_head	list;
++	struct video_device	*vdev;
++	struct v4l2_events      *events; /* events, pending and subscribed */
++};
++
++int v4l2_fh_init(struct v4l2_fh *fh, struct video_device *vdev);
++void v4l2_fh_add(struct v4l2_fh *fh);
++void v4l2_fh_del(struct v4l2_fh *fh);
++void v4l2_fh_exit(struct v4l2_fh *fh);
++
++#endif /* V4L2_EVENT_H */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/video4linux/v4l2-framework.txt
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/Documentation/video4linux/v4l2-framework.txt	2011-03-24 18:27:22.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/video4linux/v4l2-framework.txt	2011-10-14 10:20:19.187913318 -0600
+@@ -683,3 +683,100 @@
+ of the main reasons for vivi is to be a videobuf usage example. the
+ vivi_thread_tick() does the task that the IRQ callback would do on PCI
+ drivers (or the irq callback on USB).
++
++struct v4l2_fh
++--------------
++
++struct v4l2_fh provides a way to easily keep file handle specific data
++that is used by the V4L2 framework.
++
++struct v4l2_fh is allocated as a part of the driver's own file handle
++structure and is set to file->private_data in the driver's open
++function by the driver. Drivers can extract their own file handle
++structure by using the container_of macro.
++
++Useful functions:
++
++- v4l2_fh_init()
++
++  Initialise the file handle. This *MUST* be performed in the driver's
++  v4l2_file_operations->open() handler.
++
++- v4l2_fh_add()
++
++  Add a v4l2_fh to video_device file handle list. May be called after
++  initialising the file handle.
++
++- v4l2_fh_del()
++
++  Unassociate the file handle from video_device(). The file handle
++  exit function may now be called.
++
++- v4l2_fh_exit()
++
++  Uninitialise the file handle. After uninitialisation the v4l2_fh
++  memory can be freed.
++
++The users of v4l2_fh know whether a driver uses v4l2_fh as its
++file->private_data pointer by testing the V4L2_FL_USES_V4L2_FH bit in
++video_device->flags.
++
++V4L2 events
++-----------
++
++The V4L2 events provide a generic way to pass events to user space.
++The driver must use v4l2_fh to be able to support V4L2 events.
++
++Useful functions:
++
++- v4l2_event_alloc()
++
++  To use events, the driver must allocate events for the file handle. By
++  calling the function more than once, the driver may assure that at least n
++  events in total have been allocated. The function may not be called in
++  atomic context.
++
++- v4l2_event_queue()
++
++  Queue events to video device. The driver's only responsibility is to fill
++  in the type and the data fields. The other fields will be filled in by
++  V4L2.
++
++- v4l2_event_subscribe()
++
++  The video_device->ioctl_ops->vidioc_subscribe_event must check the driver
++  is able to produce events with specified event id. Then it calls
++  v4l2_event_subscribe() to subscribe the event.
++
++- v4l2_event_unsubscribe()
++
++  vidioc_unsubscribe_event in struct v4l2_ioctl_ops. A driver may use
++  v4l2_event_unsubscribe() directly unless it wants to be involved in
++  unsubscription process.
++
++  The special type V4L2_EVENT_ALL may be used to unsubscribe all events. The
++  drivers may want to handle this in a special way.
++
++- v4l2_event_pending()
++
++  Returns the number of pending events. Useful when implementing poll.
++
++Drivers do not initialise events directly. The events are initialised
++through v4l2_fh_init() if video_device->ioctl_ops->vidioc_subscribe_event is
++non-NULL. This *MUST* be performed in the driver's
++v4l2_file_operations->open() handler.
++
++Events are delivered to user space through the poll system call. The driver
++can use v4l2_fh->events->wait wait_queue_head_t as the argument for
++poll_wait().
++
++There are standard and private events. New standard events must use the
++smallest available event type. The drivers must allocate their events from
++their own class starting from class base. Class base is
++V4L2_EVENT_PRIVATE_START + n * 1000 where n is the lowest available number.
++The first event type in the class is reserved for future use, so the first
++available event type is 'class base + 1'.
++
++An example on how the V4L2 events may be used can be found in the OMAP
++3 ISP driver available at <URL:http://gitorious.org/omap3camera> as of
++writing this.
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-compat-ioctl32.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-compat-ioctl32.c	2011-03-24 18:27:31.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-compat-ioctl32.c	2011-10-14 10:20:19.187913318 -0600
+@@ -1077,6 +1077,9 @@
+ 	case VIDIOC_DBG_G_REGISTER:
+ 	case VIDIOC_DBG_G_CHIP_IDENT:
+ 	case VIDIOC_S_HW_FREQ_SEEK:
++	case VIDIOC_DQEVENT:
++	case VIDIOC_SUBSCRIBE_EVENT:
++	case VIDIOC_UNSUBSCRIBE_EVENT:
+ 		ret = do_video_ioctl(file, cmd, arg);
+ 		break;
+ 
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-ioctl.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-ioctl.c	2011-03-24 18:27:31.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-ioctl.c	2011-10-14 10:20:19.187913318 -0600
+@@ -25,6 +25,8 @@
+ #endif
+ #include <media/v4l2-common.h>
+ #include <media/v4l2-ioctl.h>
++#include <media/v4l2-fh.h>
++#include <media/v4l2-event.h>
+ #include <media/v4l2-chip-ident.h>
+ 
+ #define dbgarg(cmd, fmt, arg...) \
+@@ -284,6 +286,9 @@
+ 	[_IOC_NR(VIDIOC_DBG_G_CHIP_IDENT)] = "VIDIOC_DBG_G_CHIP_IDENT",
+ 	[_IOC_NR(VIDIOC_S_HW_FREQ_SEEK)]   = "VIDIOC_S_HW_FREQ_SEEK",
+ #endif
++	[_IOC_NR(VIDIOC_DQEVENT)]	   = "VIDIOC_DQEVENT",
++	[_IOC_NR(VIDIOC_SUBSCRIBE_EVENT)]  = "VIDIOC_SUBSCRIBE_EVENT",
++	[_IOC_NR(VIDIOC_UNSUBSCRIBE_EVENT)] = "VIDIOC_UNSUBSCRIBE_EVENT",
+ };
+ #define V4L2_IOCTLS ARRAY_SIZE(v4l2_ioctls)
+ 
+@@ -1794,7 +1799,55 @@
+ 		}
+ 		break;
+ 	}
++	case VIDIOC_DQEVENT:
++	{
++		struct v4l2_event *ev = arg;
++
++		if (!ops->vidioc_subscribe_event)
++			break;
++
++		ret = v4l2_event_dequeue(fh, ev, file->f_flags & O_NONBLOCK);
++		if (ret < 0) {
++			dbgarg(cmd, "no pending events?");
++			break;
++		}
++		dbgarg(cmd,
++		       "pending=%d, type=0x%8.8x, sequence=%d, "
++		       "timestamp=%lu.%9.9lu ",
++		       ev->pending, ev->type, ev->sequence,
++		       ev->timestamp.tv_sec, ev->timestamp.tv_nsec);
++		break;
++	}
++	case VIDIOC_SUBSCRIBE_EVENT:
++	{
++		struct v4l2_event_subscription *sub = arg;
+ 
++		if (!ops->vidioc_subscribe_event)
++			break;
++
++		ret = ops->vidioc_subscribe_event(fh, sub);
++		if (ret < 0) {
++			dbgarg(cmd, "failed, ret=%ld", ret);
++			break;
++		}
++		dbgarg(cmd, "type=0x%8.8x", sub->type);
++		break;
++	}
++	case VIDIOC_UNSUBSCRIBE_EVENT:
++	{
++		struct v4l2_event_subscription *sub = arg;
++
++		if (!ops->vidioc_unsubscribe_event)
++			break;
++
++		ret = ops->vidioc_unsubscribe_event(fh, sub);
++		if (ret < 0) {
++			dbgarg(cmd, "failed, ret=%ld", ret);
++			break;
++		}
++		dbgarg(cmd, "type=0x%8.8x", sub->type);
++		break;
++	}
+ 	default:
+ 	{
+ 		if (!ops->vidioc_default)
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/linux/videodev2.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/linux/videodev2.h	2011-03-24 18:27:35.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/linux/videodev2.h	2011-10-14 10:20:19.187913318 -0600
+@@ -1504,6 +1504,29 @@
+ };
+ 
+ /*
++ *	E V E N T S
++ */
++
++struct v4l2_event {
++	__u32				type;
++	union {
++		__u8			data[64];
++	} u;
++	__u32				pending;
++	__u32				sequence;
++	struct timespec			timestamp;
++	__u32				reserved[9];
++};
++
++struct v4l2_event_subscription {
++	__u32				type;
++	__u32				reserved[7];
++};
++
++#define V4L2_EVENT_ALL				0
++#define V4L2_EVENT_PRIVATE_START		0x08000000
++
++/*
+  *	A D V A N C E D   D E B U G G I N G
+  *
+  *	NOTE: EXPERIMENTAL API, NEVER RELY ON THIS IN APPLICATIONS!
+@@ -1619,6 +1642,10 @@
+ #endif
+ 
+ #define VIDIOC_S_HW_FREQ_SEEK	 _IOW('V', 82, struct v4l2_hw_freq_seek)
++#define	VIDIOC_DQEVENT		 _IOR('V', 89, struct v4l2_event)
++#define	VIDIOC_SUBSCRIBE_EVENT	 _IOW('V', 90, struct v4l2_event_subscription)
++#define	VIDIOC_UNSUBSCRIBE_EVENT _IOW('V', 91, struct v4l2_event_subscription)
++
+ /* Reminder: when adding new ioctls please add support for them to
+    drivers/media/video/v4l2-compat-ioctl32.c as well! */
+ 
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-event.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-event.c	2011-10-21 08:50:18.097329936 -0600
+@@ -0,0 +1,291 @@
++/*
++ * v4l2-event.c
++ *
++ * V4L2 events.
++ *
++ * Copyright (C) 2009--2010 Nokia Corporation.
++ *
++ * Contact: Sakari Ailus <sakari.ailus@maxwell.research.nokia.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ */
++
++#include <media/v4l2-dev.h>
++#include <media/v4l2-fh.h>
++#include <media/v4l2-event.h>
++
++#include <linux/sched.h>
++
++int v4l2_event_init(struct v4l2_fh *fh)
++{
++	fh->events = kzalloc(sizeof(*fh->events), GFP_KERNEL);
++	if (fh->events == NULL)
++		return -ENOMEM;
++
++	init_waitqueue_head(&fh->events->wait);
++
++	INIT_LIST_HEAD(&fh->events->free);
++	INIT_LIST_HEAD(&fh->events->available);
++	INIT_LIST_HEAD(&fh->events->subscribed);
++
++	fh->events->sequence = -1;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(v4l2_event_init);
++
++int v4l2_event_alloc(struct v4l2_fh *fh, unsigned int n)
++{
++	struct v4l2_events *events = fh->events;
++	unsigned long flags;
++
++	if (!events) {
++		WARN_ON(1);
++		return -ENOMEM;
++	}
++
++	while (events->nallocated < n) {
++		struct v4l2_kevent *kev;
++
++		kev = kzalloc(sizeof(*kev), GFP_KERNEL);
++		if (kev == NULL)
++			return -ENOMEM;
++
++		spin_lock_irqsave(&fh->vdev->fh_lock, flags);
++		list_add_tail(&kev->list, &events->free);
++		events->nallocated++;
++		spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(v4l2_event_alloc);
++
++#define list_kfree(list, type, member)				\
++	while (!list_empty(list)) {				\
++		type *hi;					\
++		hi = list_first_entry(list, type, member);	\
++		list_del(&hi->member);				\
++		kfree(hi);					\
++	}
++
++void v4l2_event_free(struct v4l2_fh *fh)
++{
++	struct v4l2_events *events = fh->events;
++
++	if (!events)
++		return;
++
++	list_kfree(&events->free, struct v4l2_kevent, list);
++	list_kfree(&events->available, struct v4l2_kevent, list);
++	list_kfree(&events->subscribed, struct v4l2_subscribed_event, list);
++
++	kfree(events);
++	fh->events = NULL;
++}
++EXPORT_SYMBOL_GPL(v4l2_event_free);
++
++static int __v4l2_event_dequeue(struct v4l2_fh *fh, struct v4l2_event *event)
++{
++	struct v4l2_events *events = fh->events;
++	struct v4l2_kevent *kev;
++	unsigned long flags;
++
++	spin_lock_irqsave(&fh->vdev->fh_lock, flags);
++
++	if (list_empty(&events->available)) {
++		spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
++		return -ENOENT;
++	}
++
++	WARN_ON(events->navailable == 0);
++
++	kev = list_first_entry(&events->available, struct v4l2_kevent, list);
++	list_move(&kev->list, &events->free);
++	events->navailable--;
++
++	kev->event.pending = events->navailable;
++	*event = kev->event;
++
++	spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
++
++	return 0;
++}
++
++int v4l2_event_dequeue(struct v4l2_fh *fh, struct v4l2_event *event,
++                      int nonblocking)
++{
++       struct v4l2_events *events = fh->events;
++       int ret;
++
++       if (nonblocking)
++               return __v4l2_event_dequeue(fh, event);
++
++       do {
++               ret = wait_event_interruptible(events->wait,
++                                              events->navailable != 0);
++               if (ret < 0)
++                       return ret;
++
++               ret = __v4l2_event_dequeue(fh, event);
++       } while (ret == -ENOENT);
++
++       return ret;
++}
++EXPORT_SYMBOL_GPL(v4l2_event_dequeue);
++
++/* Caller must hold fh->event->lock! */
++static struct v4l2_subscribed_event *v4l2_event_subscribed(
++	struct v4l2_fh *fh, u32 type)
++{
++	struct v4l2_events *events = fh->events;
++	struct v4l2_subscribed_event *sev;
++
++	WARN_ON(!spin_is_locked(&fh->vdev->fh_lock));
++
++	list_for_each_entry(sev, &events->subscribed, list) {
++		if (sev->type == type)
++			return sev;
++	}
++
++	return NULL;
++}
++
++void v4l2_event_queue(struct video_device *vdev, const struct v4l2_event *ev)
++{
++	struct v4l2_fh *fh;
++	unsigned long flags;
++	struct timespec timestamp;
++
++	ktime_get_ts(&timestamp);
++
++	spin_lock_irqsave(&vdev->fh_lock, flags);
++
++	list_for_each_entry(fh, &vdev->fh_list, list) {
++		struct v4l2_events *events = fh->events;
++		struct v4l2_kevent *kev;
++
++		/* Are we subscribed? */
++		if (!v4l2_event_subscribed(fh, ev->type))
++			continue;
++
++		/* Increase event sequence number on fh. */
++		events->sequence++;
++
++		/* Do we have any free events? */
++		if (list_empty(&events->free))
++			continue;
++
++		/* Take one and fill it. */
++		kev = list_first_entry(&events->free, struct v4l2_kevent, list);
++		kev->event.type = ev->type;
++		kev->event.u = ev->u;
++		kev->event.timestamp = timestamp;
++		kev->event.sequence = events->sequence;
++		list_move_tail(&kev->list, &events->available);
++
++		events->navailable++;
++
++		wake_up_all(&events->wait);
++	}
++
++	spin_unlock_irqrestore(&vdev->fh_lock, flags);
++}
++EXPORT_SYMBOL_GPL(v4l2_event_queue);
++
++int v4l2_event_pending(struct v4l2_fh *fh)
++{
++	return fh->events->navailable;
++}
++EXPORT_SYMBOL_GPL(v4l2_event_pending);
++
++int v4l2_event_subscribe(struct v4l2_fh *fh,
++			 struct v4l2_event_subscription *sub)
++{
++	struct v4l2_events *events = fh->events;
++	struct v4l2_subscribed_event *sev;
++	unsigned long flags;
++
++	if (fh->events == NULL) {
++		WARN_ON(1);
++		return -ENOMEM;
++	}
++
++	sev = kmalloc(sizeof(*sev), GFP_KERNEL);
++	if (!sev)
++		return -ENOMEM;
++
++	spin_lock_irqsave(&fh->vdev->fh_lock, flags);
++
++	if (v4l2_event_subscribed(fh, sub->type) == NULL) {
++		INIT_LIST_HEAD(&sev->list);
++		sev->type = sub->type;
++
++		list_add(&sev->list, &events->subscribed);
++		sev = NULL;
++	}
++
++	spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
++
++	kfree(sev);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(v4l2_event_subscribe);
++
++static void v4l2_event_unsubscribe_all(struct v4l2_fh *fh)
++{
++	struct v4l2_events *events = fh->events;
++	struct v4l2_subscribed_event *sev;
++	unsigned long flags;
++
++	do {
++		sev = NULL;
++
++		spin_lock_irqsave(&fh->vdev->fh_lock, flags);
++		if (!list_empty(&events->subscribed)) {
++			sev = list_first_entry(&events->subscribed,
++				       struct v4l2_subscribed_event, list);
++			list_del(&sev->list);
++		}
++		spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
++		kfree(sev);
++	} while (sev);
++}
++
++int v4l2_event_unsubscribe(struct v4l2_fh *fh,
++			   struct v4l2_event_subscription *sub)
++{
++	struct v4l2_subscribed_event *sev;
++	unsigned long flags;
++
++	if (sub->type == V4L2_EVENT_ALL) {
++		v4l2_event_unsubscribe_all(fh);
++		return 0;
++	}
++
++	spin_lock_irqsave(&fh->vdev->fh_lock, flags);
++
++	sev = v4l2_event_subscribed(fh, sub->type);
++	if (sev != NULL)
++		list_del(&sev->list);
++
++	spin_unlock_irqrestore(&fh->vdev->fh_lock, flags);
++
++	kfree(sev);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(v4l2_event_unsubscribe);
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-event.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-event.h	2011-10-14 10:20:19.187913318 -0600
+@@ -0,0 +1,67 @@
++/*
++ * v4l2-event.h
++ *
++ * V4L2 events.
++ *
++ * Copyright (C) 2009--2010 Nokia Corporation.
++ *
++ * Contact: Sakari Ailus <sakari.ailus@maxwell.research.nokia.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
++ * 02110-1301 USA
++ */
++
++#ifndef V4L2_EVENT_H
++#define V4L2_EVENT_H
++
++#include <linux/types.h>
++#include <linux/videodev2.h>
++#include <linux/wait.h>
++
++struct v4l2_fh;
++struct video_device;
++
++struct v4l2_kevent {
++	struct list_head	list;
++	struct v4l2_event	event;
++};
++
++struct v4l2_subscribed_event {
++	struct list_head	list;
++	u32			type;
++};
++
++struct v4l2_events {
++	wait_queue_head_t	wait;
++	struct list_head	subscribed; /* Subscribed events */
++	struct list_head	free; /* Events ready for use */
++	struct list_head	available; /* Dequeueable event */
++	unsigned int		navailable;
++	unsigned int		nallocated; /* Number of allocated events */
++	u32			sequence;
++};
++
++int v4l2_event_init(struct v4l2_fh *fh);
++int v4l2_event_alloc(struct v4l2_fh *fh, unsigned int n);
++void v4l2_event_free(struct v4l2_fh *fh);
++int v4l2_event_dequeue(struct v4l2_fh *fh, struct v4l2_event *event,
++		       int nonblocking);
++void v4l2_event_queue(struct video_device *vdev, const struct v4l2_event *ev);
++int v4l2_event_pending(struct v4l2_fh *fh);
++int v4l2_event_subscribe(struct v4l2_fh *fh,
++			 struct v4l2_event_subscription *sub);
++int v4l2_event_unsubscribe(struct v4l2_fh *fh,
++			   struct v4l2_event_subscription *sub);
++
++#endif /* V4L2_EVENT_H */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-ioctl.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-ioctl.h	2011-03-24 18:27:35.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/v4l2-ioctl.h	2011-10-14 10:20:19.187913318 -0600
+@@ -21,6 +21,8 @@
+ #include <linux/videodev2.h>
+ #endif
+ 
++struct v4l2_fh;
++
+ struct v4l2_ioctl_ops {
+ 	/* ioctl callbacks */
+ 
+@@ -239,6 +241,10 @@
+ 	int (*vidioc_enum_frameintervals) (struct file *file, void *fh,
+ 					   struct v4l2_frmivalenum *fival);
+ 
++	int (*vidioc_subscribe_event)  (struct v4l2_fh *fh,
++					struct v4l2_event_subscription *sub);
++	int (*vidioc_unsubscribe_event)(struct v4l2_fh *fh,
++					struct v4l2_event_subscription *sub);
+ 	/* For other private ioctls */
+ 	long (*vidioc_default)	       (struct file *file, void *fh,
+ 					int cmd, void *arg);
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/media-entities.tmpl
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/media-entities.tmpl	2011-03-24 18:27:22.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/media-entities.tmpl	2011-10-14 10:20:19.187913318 -0600
+@@ -17,6 +17,7 @@
+ <!ENTITY VIDIOC-DBG-G-REGISTER "<link linkend='vidioc-dbg-g-register'><constant>VIDIOC_DBG_G_REGISTER</constant></link>">
+ <!ENTITY VIDIOC-DBG-S-REGISTER "<link linkend='vidioc-dbg-g-register'><constant>VIDIOC_DBG_S_REGISTER</constant></link>">
+ <!ENTITY VIDIOC-DQBUF "<link linkend='vidioc-qbuf'><constant>VIDIOC_DQBUF</constant></link>">
++<!ENTITY VIDIOC-DQEVENT "<link linkend='vidioc-dqevent'><constant>VIDIOC_DQEVENT</constant></link>">
+ <!ENTITY VIDIOC-ENCODER-CMD "<link linkend='vidioc-encoder-cmd'><constant>VIDIOC_ENCODER_CMD</constant></link>">
+ <!ENTITY VIDIOC-ENUMAUDIO "<link linkend='vidioc-enumaudio'><constant>VIDIOC_ENUMAUDIO</constant></link>">
+ <!ENTITY VIDIOC-ENUMAUDOUT "<link linkend='vidioc-enumaudioout'><constant>VIDIOC_ENUMAUDOUT</constant></link>">
+@@ -56,6 +57,7 @@
+ <!ENTITY VIDIOC-REQBUFS "<link linkend='vidioc-reqbufs'><constant>VIDIOC_REQBUFS</constant></link>">
+ <!ENTITY VIDIOC-STREAMOFF "<link linkend='vidioc-streamon'><constant>VIDIOC_STREAMOFF</constant></link>">
+ <!ENTITY VIDIOC-STREAMON "<link linkend='vidioc-streamon'><constant>VIDIOC_STREAMON</constant></link>">
++<!ENTITY VIDIOC-SUBSCRIBE-EVENT "<link linkend='vidioc-subscribe-event'><constant>VIDIOC_SUBSCRIBE_EVENT</constant></link>">
+ <!ENTITY VIDIOC-S-AUDIO "<link linkend='vidioc-g-audio'><constant>VIDIOC_S_AUDIO</constant></link>">
+ <!ENTITY VIDIOC-S-AUDOUT "<link linkend='vidioc-g-audioout'><constant>VIDIOC_S_AUDOUT</constant></link>">
+ <!ENTITY VIDIOC-S-CROP "<link linkend='vidioc-g-crop'><constant>VIDIOC_S_CROP</constant></link>">
+@@ -131,6 +133,8 @@
+ <!ENTITY v4l2-enc-idx "struct&nbsp;<link linkend='v4l2-enc-idx'>v4l2_enc_idx</link>">
+ <!ENTITY v4l2-enc-idx-entry "struct&nbsp;<link linkend='v4l2-enc-idx-entry'>v4l2_enc_idx_entry</link>">
+ <!ENTITY v4l2-encoder-cmd "struct&nbsp;<link linkend='v4l2-encoder-cmd'>v4l2_encoder_cmd</link>">
++<!ENTITY v4l2-event "struct&nbsp;<link linkend='v4l2-event'>v4l2_event</link>">
++<!ENTITY v4l2-event-subscription "struct&nbsp;<link linkend='v4l2-event-subscription'>v4l2_event_subscription</link>">
+ <!ENTITY v4l2-ext-control "struct&nbsp;<link linkend='v4l2-ext-control'>v4l2_ext_control</link>">
+ <!ENTITY v4l2-ext-controls "struct&nbsp;<link linkend='v4l2-ext-controls'>v4l2_ext_controls</link>">
+ <!ENTITY v4l2-fmtdesc "struct&nbsp;<link linkend='v4l2-fmtdesc'>v4l2_fmtdesc</link>">
+@@ -190,6 +194,7 @@
+ <!ENTITY sub-controls SYSTEM "v4l/controls.xml">
+ <!ENTITY sub-dev-capture SYSTEM "v4l/dev-capture.xml">
+ <!ENTITY sub-dev-codec SYSTEM "v4l/dev-codec.xml">
++<!ENTITY sub-dev-event SYSTEM "v4l/dev-event.xml">
+ <!ENTITY sub-dev-effect SYSTEM "v4l/dev-effect.xml">
+ <!ENTITY sub-dev-osd SYSTEM "v4l/dev-osd.xml">
+ <!ENTITY sub-dev-output SYSTEM "v4l/dev-output.xml">
+@@ -278,6 +283,8 @@
+ <!ENTITY sub-v4l2grab-c SYSTEM "v4l/v4l2grab.c.xml">
+ <!ENTITY sub-videodev2-h SYSTEM "v4l/videodev2.h.xml">
+ <!ENTITY sub-v4l2 SYSTEM "v4l/v4l2.xml">
++<!ENTITY sub-dqevent SYSTEM "v4l/vidioc-dqevent.xml">
++<!ENTITY sub-subscribe-event SYSTEM "v4l/vidioc-subscribe-event.xml">
+ <!ENTITY sub-intro SYSTEM "dvb/intro.xml">
+ <!ENTITY sub-frontend SYSTEM "dvb/frontend.xml">
+ <!ENTITY sub-isdbt SYSTEM "dvb/isdbt.xml">
+@@ -362,3 +369,5 @@
+ <!ENTITY reqbufs SYSTEM "v4l/vidioc-reqbufs.xml">
+ <!ENTITY s-hw-freq-seek SYSTEM "v4l/vidioc-s-hw-freq-seek.xml">
+ <!ENTITY streamon SYSTEM "v4l/vidioc-streamon.xml">
++<!ENTITY dqevent SYSTEM "v4l/vidioc-dqevent.xml">
++<!ENTITY subscribe_event SYSTEM "v4l/vidioc-subscribe-event.xml">
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/dev-event.xml
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/dev-event.xml	2011-10-14 10:20:19.197917407 -0600
+@@ -0,0 +1,31 @@
++  <title>Event Interface</title>
++
++  <para>The V4L2 event interface provides means for user to get
++  immediately notified on certain conditions taking place on a device.
++  This might include start of frame or loss of signal events, for
++  example.
++  </para>
++
++  <para>To receive events, the events the user is interested in first must
++  be subscribed using the &VIDIOC-SUBSCRIBE-EVENT; ioctl. Once an event is
++  subscribed, the events of subscribed types are dequeueable using the
++  &VIDIOC-DQEVENT; ioctl. Events may be unsubscribed using
++  VIDIOC_UNSUBSCRIBE_EVENT ioctl. The special event type V4L2_EVENT_ALL may
++  be used to unsubscribe all the events the driver supports.</para>
++
++  <para>The event subscriptions and event queues are specific to file
++  handles. Subscribing an event on one file handle does not affect
++  other file handles.
++  </para>
++
++  <para>The information on dequeueable events is obtained by using select or
++  poll system calls on video devices. The V4L2 events use POLLPRI events on
++  poll system call and exceptions on select system call.  </para>
++
++  <!--
++Local Variables:
++mode: sgml
++sgml-parent-document: "v4l2.sgml"
++indent-tabs-mode: nil
++End:
++  -->
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/v4l2.xml
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/v4l2.xml	2011-03-24 18:27:22.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/v4l2.xml	2011-10-14 10:20:19.197917407 -0600
+@@ -383,6 +383,7 @@
+     <section id="ttx"> &sub-dev-teletext; </section>
+     <section id="radio"> &sub-dev-radio; </section>
+     <section id="rds"> &sub-dev-rds; </section>
++    <section id="event"> &sub-dev-event; </section>
+   </chapter>
+ 
+   <chapter id="driver">
+@@ -408,6 +409,7 @@
+     &sub-cropcap;
+     &sub-dbg-g-chip-ident;
+     &sub-dbg-g-register;
++    &sub-dqevent;
+     &sub-encoder-cmd;
+     &sub-enumaudio;
+     &sub-enumaudioout;
+@@ -445,6 +447,7 @@
+     &sub-reqbufs;
+     &sub-s-hw-freq-seek;
+     &sub-streamon;
++    &sub-subscribe-event;
+     <!-- End of ioctls. -->
+     &sub-mmap;
+     &sub-munmap;
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/vidioc-dqevent.xml
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/vidioc-dqevent.xml	2011-10-14 10:20:19.197917407 -0600
+@@ -0,0 +1,124 @@
++<refentry id="vidioc-dqevent">
++  <refmeta>
++    <refentrytitle>ioctl VIDIOC_DQEVENT</refentrytitle>
++    &manvol;
++  </refmeta>
++
++  <refnamediv>
++    <refname>VIDIOC_DQEVENT</refname>
++    <refpurpose>Dequeue event</refpurpose>
++  </refnamediv>
++
++  <refsynopsisdiv>
++    <funcsynopsis>
++      <funcprototype>
++	<funcdef>int <function>ioctl</function></funcdef>
++	<paramdef>int <parameter>fd</parameter></paramdef>
++	<paramdef>int <parameter>request</parameter></paramdef>
++	<paramdef>struct v4l2_event
++*<parameter>argp</parameter></paramdef>
++      </funcprototype>
++    </funcsynopsis>
++  </refsynopsisdiv>
++
++  <refsect1>
++    <title>Arguments</title>
++
++    <variablelist>
++      <varlistentry>
++	<term><parameter>fd</parameter></term>
++	<listitem>
++	  <para>&fd;</para>
++	</listitem>
++      </varlistentry>
++      <varlistentry>
++	<term><parameter>request</parameter></term>
++	<listitem>
++	  <para>VIDIOC_DQEVENT</para>
++	</listitem>
++      </varlistentry>
++      <varlistentry>
++	<term><parameter>argp</parameter></term>
++	<listitem>
++	  <para></para>
++	</listitem>
++      </varlistentry>
++    </variablelist>
++  </refsect1>
++
++  <refsect1>
++    <title>Description</title>
++
++    <para>Dequeue an event from a video device. No input is required
++    for this ioctl. All the fields of the &v4l2-event; structure are
++    filled by the driver. The file handle will also receive exceptions
++    which the application may get by e.g. using the select system
++    call.</para>
++
++    <table frame="none" pgwide="1" id="v4l2-event">
++      <title>struct <structname>v4l2_event</structname></title>
++      <tgroup cols="4">
++	&cs-str;
++	<tbody valign="top">
++	  <row>
++	    <entry>__u32</entry>
++	    <entry><structfield>type</structfield></entry>
++            <entry></entry>
++	    <entry>Type of the event.</entry>
++	  </row>
++	  <row>
++	    <entry>union</entry>
++	    <entry><structfield>u</structfield></entry>
++            <entry></entry>
++	    <entry></entry>
++	  </row>
++	  <row>
++	    <entry></entry>
++	    <entry>__u8</entry>
++            <entry><structfield>data</structfield>[64]</entry>
++	    <entry>Event data. Defined by the event type. The union
++            should be used to define easily accessible type for
++            events.</entry>
++	  </row>
++	  <row>
++	    <entry>__u32</entry>
++	    <entry><structfield>pending</structfield></entry>
++            <entry></entry>
++	    <entry>Number of pending events excluding this one.</entry>
++	  </row>
++	  <row>
++	    <entry>__u32</entry>
++	    <entry><structfield>sequence</structfield></entry>
++            <entry></entry>
++	    <entry>Event sequence number. The sequence number is
++	    incremented for every subscribed event that takes place.
++	    If sequence numbers are not contiguous it means that
++	    events have been lost.
++	    </entry>
++	  </row>
++	  <row>
++	    <entry>struct timeval</entry>
++	    <entry><structfield>timestamp</structfield></entry>
++            <entry></entry>
++	    <entry>Event timestamp.</entry>
++	  </row>
++	  <row>
++	    <entry>__u32</entry>
++	    <entry><structfield>reserved</structfield>[9]</entry>
++            <entry></entry>
++	    <entry>Reserved for future extensions. Drivers must set
++	    the array to zero.</entry>
++	  </row>
++	</tbody>
++      </tgroup>
++    </table>
++
++  </refsect1>
++</refentry>
++<!--
++Local Variables:
++mode: sgml
++sgml-parent-document: "v4l2.sgml"
++indent-tabs-mode: nil
++End:
++-->
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/vidioc-subscribe-event.xml
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/Documentation/DocBook/v4l/vidioc-subscribe-event.xml	2011-10-14 10:20:19.197917407 -0600
+@@ -0,0 +1,104 @@
++<refentry id="vidioc-subscribe-event">
++  <refmeta>
++    <refentrytitle>ioctl VIDIOC_SUBSCRIBE_EVENT, VIDIOC_UNSUBSCRIBE_EVENT</refentrytitle>
++    &manvol;
++  </refmeta>
++
++  <refnamediv>
++    <refname>VIDIOC_SUBSCRIBE_EVENT, VIDIOC_UNSUBSCRIBE_EVENT</refname>
++    <refpurpose>Subscribe or unsubscribe event</refpurpose>
++  </refnamediv>
++
++  <refsynopsisdiv>
++    <funcsynopsis>
++      <funcprototype>
++	<funcdef>int <function>ioctl</function></funcdef>
++	<paramdef>int <parameter>fd</parameter></paramdef>
++	<paramdef>int <parameter>request</parameter></paramdef>
++	<paramdef>struct v4l2_event_subscription
++*<parameter>argp</parameter></paramdef>
++      </funcprototype>
++    </funcsynopsis>
++  </refsynopsisdiv>
++
++  <refsect1>
++    <title>Arguments</title>
++
++    <variablelist>
++      <varlistentry>
++	<term><parameter>fd</parameter></term>
++	<listitem>
++	  <para>&fd;</para>
++	</listitem>
++      </varlistentry>
++      <varlistentry>
++	<term><parameter>request</parameter></term>
++	<listitem>
++	  <para>VIDIOC_SUBSCRIBE_EVENT, VIDIOC_UNSUBSCRIBE_EVENT</para>
++	</listitem>
++      </varlistentry>
++      <varlistentry>
++	<term><parameter>argp</parameter></term>
++	<listitem>
++	  <para></para>
++	</listitem>
++      </varlistentry>
++    </variablelist>
++  </refsect1>
++
++  <refsect1>
++    <title>Description</title>
++
++    <para>Subscribe or unsubscribe V4L2 event. Subscribed events are
++    dequeued by using the &VIDIOC-DQEVENT; ioctl.</para>
++
++    <table frame="none" pgwide="1" id="v4l2-event-subscription">
++      <title>struct <structname>v4l2_event_subscription</structname></title>
++      <tgroup cols="3">
++	&cs-str;
++	<tbody valign="top">
++	  <row>
++	    <entry>__u32</entry>
++	    <entry><structfield>type</structfield></entry>
++	    <entry>Type of the event.</entry>
++	  </row>
++	  <row>
++	    <entry>__u32</entry>
++	    <entry><structfield>reserved</structfield>[7]</entry>
++	    <entry>Reserved for future extensions. Drivers and applications
++	    must set the array to zero.</entry>
++	  </row>
++	</tbody>
++      </tgroup>
++    </table>
++
++    <table frame="none" pgwide="1" id="event-type">
++      <title>Event Types</title>
++      <tgroup cols="3">
++	&cs-def;
++	<tbody valign="top">
++	  <row>
++	    <entry><constant>V4L2_EVENT_ALL</constant></entry>
++	    <entry>0</entry>
++	    <entry>All events. V4L2_EVENT_ALL is valid only for
++	    VIDIOC_UNSUBSCRIBE_EVENT for unsubscribing all events at once.
++	    </entry>
++	  </row>
++	  <row>
++	    <entry><constant>V4L2_EVENT_PRIVATE_START</constant></entry>
++	    <entry>0x08000000</entry>
++	    <entry>Base event number for driver-private events.</entry>
++	  </row>
++	</tbody>
++      </tgroup>
++    </table>
++
++  </refsect1>
++</refentry>
++<!--
++Local Variables:
++mode: sgml
++sgml-parent-document: "v4l2.sgml"
++indent-tabs-mode: nil
++End:
++-->

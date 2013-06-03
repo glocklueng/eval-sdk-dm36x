@@ -1,0 +1,829 @@
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/Makefile.am
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/Makefile.am	2013-02-01 17:12:08.811935863 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/Makefile.am	2013-02-01 17:12:30.691935676 -0600
+@@ -44,6 +44,7 @@
+ 				tuner.c \
+ 				tunerchannel.c \
+ 				tunernorm.c \
++				v4l2_dm36x_ipipe.c\
+ 				$(xv_source)
+ nodist_libgstvideo4linux2_la_SOURCES = $(built_sources) $(built_headers)
+ 
+@@ -79,5 +80,6 @@
+ 	v4l2_calls.h \
+ 	tuner.h \
+ 	tunerchannel.h \
+-	tunernorm.h
++	tunernorm.h \
++	v4l2_dm36x_ipipe.h
+ 
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/Makefile.in
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/Makefile.in	2013-02-01 17:12:08.851935859 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/Makefile.in	2013-02-01 17:12:30.691935676 -0600
+@@ -146,7 +146,7 @@
+ 	gstv4l2colorbalance.c gstv4l2object.c gstv4l2bufferpool.c \
+ 	gstv4l2sink.c gstv4l2src.c gstv4l2radio.c gstv4l2tuner.c \
+ 	gstv4l2vidorient.c v4l2_calls.c tuner.c tunerchannel.c \
+-	tunernorm.c gstv4l2videooverlay.c
++	tunernorm.c v4l2_dm36x_ipipe.c gstv4l2videooverlay.c
+ @USE_XVIDEO_TRUE@am__objects_1 =  \
+ @USE_XVIDEO_TRUE@	libgstvideo4linux2_la-gstv4l2videooverlay.lo
+ am_libgstvideo4linux2_la_OBJECTS = libgstvideo4linux2_la-gstv4l2.lo \
+@@ -161,7 +161,8 @@
+ 	libgstvideo4linux2_la-v4l2_calls.lo \
+ 	libgstvideo4linux2_la-tuner.lo \
+ 	libgstvideo4linux2_la-tunerchannel.lo \
+-	libgstvideo4linux2_la-tunernorm.lo $(am__objects_1)
++	libgstvideo4linux2_la-tunernorm.lo \
++	libgstvideo4linux2_la-v4l2_dm36x_ipipe.lo $(am__objects_1)
+ am__objects_2 = libgstvideo4linux2_la-tuner-marshal.lo \
+ 	libgstvideo4linux2_la-tuner-enumtypes.lo
+ am__objects_3 =
+@@ -574,6 +575,7 @@
+ 				tuner.c \
+ 				tunerchannel.c \
+ 				tunernorm.c \
++				v4l2_dm36x_ipipe.c\
+ 				$(xv_source)
+ 
+ nodist_libgstvideo4linux2_la_SOURCES = $(built_sources) $(built_headers)
+@@ -608,7 +610,8 @@
+ 	v4l2_calls.h \
+ 	tuner.h \
+ 	tunerchannel.h \
+-	tunernorm.h
++	tunernorm.h \
++	v4l2_dm36x_ipipe.h
+ 
+ all: $(BUILT_SOURCES)
+ 	$(MAKE) $(AM_MAKEFLAGS) all-am
+@@ -816,6 +819,14 @@
+ @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+ @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstvideo4linux2_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstvideo4linux2_la_CFLAGS) $(CFLAGS) -c -o libgstvideo4linux2_la-tunernorm.lo `test -f 'tunernorm.c' || echo '$(srcdir)/'`tunernorm.c
+ 
++libgstvideo4linux2_la-v4l2_dm36x_ipipe.lo: v4l2_dm36x_ipipe.c
++@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstvideo4linux2_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstvideo4linux2_la_CFLAGS) $(CFLAGS) -MT libgstvideo4linux2_la-v4l2_dm36x_ipipe.lo -MD -MP -MF $(DEPDIR)/libgstvideo4linux2_la-v4l2_dm36x_ipipe.Tpo -c -o libgstvideo4linux2_la-v4l2_dm36x_ipipe.lo `test -f 'v4l2_dm36x_ipipe.c' || echo '$(srcdir)/'`v4l2_dm36x_ipipe.c
++@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstvideo4linux2_la-v4l2_dm36x_ipipe.Tpo $(DEPDIR)/libgstvideo4linux2_la-v4l2_dm36x_ipipe.Plo
++@am__fastdepCC_FALSE@	$(AM_V_CC) @AM_BACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='v4l2_dm36x_ipipe.c' object='libgstvideo4linux2_la-v4l2_dm36x_ipipe.lo' libtool=yes @AMDEPBACKSLASH@
++@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
++@am__fastdepCC_FALSE@	$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstvideo4linux2_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstvideo4linux2_la_CFLAGS) $(CFLAGS) -c -o libgstvideo4linux2_la-v4l2_dm36x_ipipe.lo `test -f 'v4l2_dm36x_ipipe.c' || echo '$(srcdir)/'`v4l2_dm36x_ipipe.c
++
+ libgstvideo4linux2_la-gstv4l2videooverlay.lo: gstv4l2videooverlay.c
+ @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(libgstvideo4linux2_la_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libgstvideo4linux2_la_CFLAGS) $(CFLAGS) -MT libgstvideo4linux2_la-gstv4l2videooverlay.lo -MD -MP -MF $(DEPDIR)/libgstvideo4linux2_la-gstv4l2videooverlay.Tpo -c -o libgstvideo4linux2_la-gstv4l2videooverlay.lo `test -f 'gstv4l2videooverlay.c' || echo '$(srcdir)/'`gstv4l2videooverlay.c
+ @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libgstvideo4linux2_la-gstv4l2videooverlay.Tpo $(DEPDIR)/libgstvideo4linux2_la-gstv4l2videooverlay.Plo
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/v4l2_dm36x_ipipe.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gst-plugins-good-1.0.5/src/sys/v4l2/v4l2_dm36x_ipipe.c	2013-02-01 17:12:30.691935676 -0600
+@@ -0,0 +1,538 @@
++/*
++ * v4l2_dm36x_ipipe.c
++ *
++ * This file defines functions needed to configure the DM36x IPIPE in
++ * on-the-fly mode with the capture driver.  The capture driver by itself
++ * only supports UYVY, but using the IPIPE we can convert to NV12 on the
++ * fly during capture, which is the color format expected by some codecs.
++ *
++ * Original Author:
++ *     Don Darling, Texas Instruments, Inc.
++ *
++ * DMAI's capture code was heavily referenced for this implementation.
++ * DMAI uses the following license:
++ *
++ * --COPYRIGHT--,BSD
++ * Copyright (c) 2010, Texas Instruments Incorporated
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * *  Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * *  Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * *  Neither the name of Texas Instruments Incorporated nor the names of
++ *    its contributors may be used to endorse or promote products derived
++ *    from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
++ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
++ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
++ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
++ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ * --/COPYRIGHT--
++ */
++#ifdef HAVE_CONFIG_H
++#include <config.h>
++#endif
++
++#include <sys/types.h>
++#include <sys/stat.h>
++#include <fcntl.h>
++#include <unistd.h>
++#include <sys/ioctl.h>
++
++#include <string.h>
++
++#include <gst/gst.h>
++#include <gst/gst-i18n-plugin.h>
++#include <media/davinci/imp_previewer.h>
++#include <media/davinci/imp_resizer.h>
++#include <media/davinci/dm365_ipipe.h>
++
++#include "v4l2_dm36x_ipipe.h"
++
++/* Constants */
++static const char * davinci_resizer_dev   = "/dev/davinci_resizer";
++static const char * davinci_previewer_dev = "/dev/davinci_previewer";
++
++/* Static Functions */
++static gboolean
++gst_v4l2_dm36x_resizer_open(GstV4l2Src * v4l2src);
++
++static gboolean
++gst_v4l2_dm36x_resizer_init(GstV4l2Src * v4l2src);
++
++static gboolean
++gst_v4l2_dm36x_resizer_close(GstV4l2Src * v4l2src);
++
++static gboolean
++gst_v4l2_dm36x_previewer_open(GstV4l2Src * v4l2src);
++
++static gboolean
++gst_v4l2_dm36x_previewer_init(GstV4l2Src * v4l2src);
++
++static gboolean
++gst_v4l2_dm36x_previewer_close(GstV4l2Src * v4l2src);
++
++static gboolean
++gst_v4l2_dev_char_open(GstV4l2Src * v4l2src, const char *filename,
++  int *fd);
++
++static gboolean
++gst_v4l2_dev_char_close(GstV4l2Src * v4l2src, const char *filename,
++  int *fd);
++
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_ipipe_open():
++ *   Open the IPIPE devices
++ * return value: TRUE on success, FALSE on error
++ *****************************************************************************/
++gboolean
++gst_v4l2_dm36x_ipipe_open (GstV4l2Src * v4l2src)
++{
++  if (!gst_v4l2_dm36x_resizer_open(v4l2src))
++    return FALSE;
++  if (!gst_v4l2_dm36x_previewer_open(v4l2src))
++    return FALSE;
++
++  return TRUE;
++}
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_ipipe_init():
++ *   Initialize the IPIPE devices
++ * return value: TRUE on success, FALSE on error
++ *****************************************************************************/
++gboolean
++gst_v4l2_dm36x_ipipe_init (GstV4l2Src * v4l2src)
++{
++  if (!gst_v4l2_dm36x_resizer_init(v4l2src))
++    return FALSE;
++  if (!gst_v4l2_dm36x_previewer_init(v4l2src))
++    return FALSE;
++
++  return TRUE;
++}
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_ipipe_close():
++ *   Close the IPIPE devices
++ * return value: TRUE on success, FALSE on error
++ *****************************************************************************/
++gboolean
++gst_v4l2_dm36x_ipipe_close (GstV4l2Src * v4l2src)
++{
++  if (!gst_v4l2_dm36x_resizer_close(v4l2src))
++    return FALSE;
++  if (!gst_v4l2_dm36x_previewer_close(v4l2src))
++    return FALSE;
++
++  return TRUE;
++}
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_resizer_open():
++ *   Open the resizer device
++ * return value:
++ *   TRUE on success, FALSE on error
++ *****************************************************************************/
++static gboolean
++gst_v4l2_dm36x_resizer_open (GstV4l2Src * v4l2src)
++{
++  /* make sure we have a device to open */
++  if (!v4l2src->davinci_resizer_dev)
++    v4l2src->davinci_resizer_dev = g_strdup (davinci_resizer_dev);
++
++  return gst_v4l2_dev_char_open(v4l2src, v4l2src->davinci_resizer_dev,
++    &v4l2src->davinci_resizer_fd);
++}
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_resizer_init():
++ *   Initialize the resizer device
++ * return value:
++ *   TRUE on success, FALSE on error
++ *****************************************************************************/
++static gboolean
++gst_v4l2_dm36x_resizer_init (GstV4l2Src * v4l2src)
++{
++  gint         *rsz_fd    = &v4l2src->davinci_resizer_fd;
++  unsigned int  user_mode = IMP_MODE_CONTINUOUS;
++  unsigned int  oper_mode;
++
++  struct rsz_channel_config    rsz_chan_config;
++  struct rsz_continuous_config rsz_cont_config;
++
++  /* make sure the resizer has been opened */
++  if (!GST_V4L2_RESIZER_IS_OPEN(v4l2src))
++    goto not_open;
++
++  /* set the operation mode to confinuous */
++  if (ioctl(*rsz_fd, RSZ_S_OPER_MODE, &user_mode) < 0)
++    goto cant_set_oper_mode;
++  if (ioctl(*rsz_fd, RSZ_G_OPER_MODE, &oper_mode) < 0)
++    goto cant_get_oper_mode;
++  if (oper_mode != user_mode)
++    goto set_mode_failed;
++
++  /* initialize resizer driver with default configuration */
++  memset(&rsz_chan_config, 0, sizeof(rsz_chan_config));
++  rsz_chan_config.oper_mode = oper_mode;
++  rsz_chan_config.chain     = 1;
++  rsz_chan_config.len       = 0;
++  rsz_chan_config.config    = NULL;
++
++  if (ioctl(*rsz_fd, RSZ_S_CONFIG, &rsz_chan_config) < 0)
++    goto init_resizer_failed;
++
++  /* retrieve all of the default configuration settings from the driver */
++  memset(&rsz_cont_config, 0, sizeof(rsz_cont_config));
++  rsz_chan_config.oper_mode = oper_mode;
++  rsz_chan_config.chain     = 1;
++  rsz_chan_config.len       = sizeof(rsz_cont_config);
++  rsz_chan_config.config    = &rsz_cont_config;
++
++  if (ioctl(*rsz_fd, RSZ_G_CONFIG, &rsz_chan_config) < 0)
++    goto get_config_failed;
++
++  /* modify the default settings for chaining and send the updated
++   * configuration back to the driver.
++   */
++  rsz_cont_config.output1.enable = 1;
++  rsz_cont_config.output2.enable = 0;
++  rsz_chan_config.len            = sizeof(rsz_cont_config);
++  rsz_chan_config.config         = &rsz_cont_config;
++  if (ioctl(*rsz_fd, RSZ_S_CONFIG, &rsz_chan_config) < 0)
++    goto set_config_failed;
++
++  return TRUE;
++
++  /* Errors */
++not_open:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Device '%s' is not open."), v4l2src->davinci_resizer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++cant_set_oper_mode:
++  {
++    /* Don't error out on this one -- this is just an indication that the
++     * hardware configuration cannot handle continuous mode.  The kernel
++     * command line option d365_imp.oper_mode needs to be set to 0.
++     */
++    GST_ELEMENT_INFO (v4l2src, RESOURCE, SETTINGS,
++        (_("Cannot set operation mode on '%s'."),
++          v4l2src->davinci_resizer_dev),
++        NULL);
++    goto error;
++  }
++cant_get_oper_mode:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Cannot get operation mode on '%s'."),
++          v4l2src->davinci_resizer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++set_mode_failed:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Failed to set continuous mode on '%s'."),
++          v4l2src->davinci_resizer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++init_resizer_failed:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Failed to set default configuration on '%s'."),
++          v4l2src->davinci_resizer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++get_config_failed:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Failed to get configuration settings on '%s'."),
++          v4l2src->davinci_resizer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++set_config_failed:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Failed to set configuration on '%s'."),
++          v4l2src->davinci_resizer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++error:
++  {
++    close (*rsz_fd);
++    *rsz_fd = -1;
++    return FALSE;
++  }
++}
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_resizer_close():
++ *   Close the resizer device
++ * return value:
++ *   TRUE on success, FALSE on error
++ *****************************************************************************/
++static gboolean
++gst_v4l2_dm36x_resizer_close (GstV4l2Src * v4l2src)
++{
++  return gst_v4l2_dev_char_close(v4l2src, v4l2src->davinci_resizer_dev,
++    &v4l2src->davinci_resizer_fd);
++}
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_previewer_open():
++ *   Open the previewer device
++ * return value:
++ *   TRUE on success, FALSE on error
++ *****************************************************************************/
++static gboolean
++gst_v4l2_dm36x_previewer_open (GstV4l2Src * v4l2src)
++{
++  /* make sure we have a device to open */
++  if (!v4l2src->davinci_previewer_dev)
++    v4l2src->davinci_previewer_dev = g_strdup (davinci_previewer_dev);
++
++  return gst_v4l2_dev_char_open(v4l2src, v4l2src->davinci_previewer_dev,
++    &v4l2src->davinci_previewer_fd);
++}
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_previewer_init():
++ *   Initialize the previewer device
++ * return value:
++ *   TRUE on success, FALSE on error
++ *****************************************************************************/
++static gboolean
++gst_v4l2_dm36x_previewer_init (GstV4l2Src * v4l2src)
++{
++  gint         *preview_fd = &v4l2src->davinci_previewer_fd;
++  unsigned int  user_mode  = IMP_MODE_CONTINUOUS;
++  unsigned int  oper_mode;
++
++  struct prev_channel_config prev_chan_config;
++
++  /* make sure the previewer has been opened */
++  if (!GST_V4L2_PREVIEWER_IS_OPEN(v4l2src))
++    goto not_open;
++
++  /* set the operation mode to confinuous */
++  if (ioctl(*preview_fd, PREV_S_OPER_MODE, &user_mode) < 0)
++    goto cant_set_oper_mode;
++  if (ioctl(*preview_fd, PREV_G_OPER_MODE, &oper_mode) < 0)
++    goto cant_get_oper_mode;
++  if (oper_mode != user_mode)
++    goto set_mode_failed;
++
++  /* initialize previewer driver with default configuration */
++  memset(&prev_chan_config, 0, sizeof(prev_chan_config));
++  prev_chan_config.oper_mode = oper_mode;
++  prev_chan_config.len       = 0;
++  prev_chan_config.config    = NULL;
++
++  if (ioctl(*preview_fd, PREV_S_CONFIG, &prev_chan_config) < 0)
++    goto init_previewer_failed;
++
++  /* default driver settings are adequate for the previewer -- no further
++   * modifications are needed.
++   */
++  return TRUE;
++
++  /* Errors */
++not_open:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Device '%s' is not open."), v4l2src->davinci_previewer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++cant_set_oper_mode:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Cannot set operation mode on '%s'."),
++          v4l2src->davinci_previewer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++cant_get_oper_mode:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Cannot get operation mode on '%s'."),
++          v4l2src->davinci_previewer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++set_mode_failed:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Failed to set continuous mode on '%s'."),
++          v4l2src->davinci_previewer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++init_previewer_failed:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, SETTINGS,
++        (_("Failed to set default configuration on '%s'."),
++          v4l2src->davinci_previewer_dev),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++error:
++  {
++    close (*preview_fd);
++    *preview_fd = -1;
++    return FALSE;
++  }
++}
++
++/*****************************************************************************
++ * gst_v4l2_dm36x_previewer_close():
++ *   Close the previewer device
++ * return value:
++ *   TRUE on success, FALSE on error
++ *****************************************************************************/
++static gboolean
++gst_v4l2_dm36x_previewer_close (GstV4l2Src * v4l2src)
++{
++  return gst_v4l2_dev_char_close(v4l2src, v4l2src->davinci_previewer_dev,
++    &v4l2src->davinci_previewer_fd);
++}
++
++/*****************************************************************************
++ * gst_v4l2_dev_char_open():
++ *   Open a character device for reading and writing
++ * return value:
++ *   TRUE on success, FALSE on error
++ *   Device file descriptor is returned in "fd"
++ *****************************************************************************/
++static gboolean
++gst_v4l2_dev_char_open (GstV4l2Src * v4l2src, const char *filename,
++  int *fd)
++{
++  struct stat st;
++
++  /* make sure we have a device to open */
++  if (!filename)
++    goto no_file;
++
++  /* make sure it is a device file */
++  if (stat (filename, &st) == -1)
++    goto stat_failed;
++
++  if (!S_ISCHR (st.st_mode))
++    goto no_device;
++
++  /* open the device */
++  GST_DEBUG_OBJECT (v4l2src, "Trying to open device %s",
++    filename);
++
++  *fd = open(filename, O_RDWR);
++
++  if (*fd <= 0)
++    goto not_open;
++
++  GST_INFO_OBJECT (v4l2src, "Opened device '%s' successfully",
++    filename);
++
++  return TRUE;
++
++  /* Errors */
++no_file:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, NOT_FOUND,
++        (_("Device file not specified.")),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++stat_failed:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, READ,
++        (_("Cannot identify device '%s'."), filename),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++no_device:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, FAILED,
++        (_("This isn't a device '%s'."), filename),
++        GST_ERROR_SYSTEM);
++    goto error;
++  }
++not_open:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, OPEN_READ_WRITE,
++        (_("Could not open device '%s' for reading and writing."),
++            filename), GST_ERROR_SYSTEM);
++    goto error;
++  }
++error:
++  {
++    /* close the device if it was opened successfully */
++    if (*fd > 0) {
++      close (*fd);
++      *fd = -1;
++    }
++    return FALSE;
++  }
++}
++
++/*****************************************************************************
++ * gst_v4l2_dev_char_close():
++ *   Close a character device
++ * return value:
++ *   TRUE on success, FALSE on error
++ *****************************************************************************/
++static gboolean
++gst_v4l2_dev_char_close (GstV4l2Src * v4l2src, const char *filename,
++  int *fd)
++{
++  GST_DEBUG_OBJECT (v4l2src, "Trying to close %s",
++      filename);
++
++  if (*fd > 0) {
++    if (close (*fd) < 0)
++        goto fail_close;
++    *fd = -1;
++  }
++
++  GST_INFO_OBJECT (v4l2src, "Closed device '%s' successfully",
++    filename);
++
++  return TRUE;
++
++  /* Errors */
++fail_close:
++  {
++    GST_ELEMENT_ERROR (v4l2src, RESOURCE, CLOSE,
++        (_("Failed to close device '%s'."),
++            filename), GST_ERROR_SYSTEM);
++    goto error;
++  }
++error:
++  {
++    return FALSE;
++  }
++}
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/v4l2_dm36x_ipipe.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ gst-plugins-good-1.0.5/src/sys/v4l2/v4l2_dm36x_ipipe.h	2013-02-01 17:12:30.691935676 -0600
+@@ -0,0 +1,63 @@
++/*
++ * v4l2_dm36x_ipipe.h
++ *
++ * This file defines functions needed to configure the DM36x IPIPE in
++ * on-the-fly mode with the capture driver.  The capture driver by itself
++ * only supports UYVY, but using the IPIPE we can convert to NV12 on the
++ * fly during capture, which is the color format expected by some codecs.
++ *
++ * DMAI's capture code was heavily referenced for this implementation, and in
++ * some places copied verbatim.  DMAI uses the following license:
++ *
++ * --COPYRIGHT--,BSD
++ * Copyright (c) 2010, Texas Instruments Incorporated
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * *  Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * *  Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * *  Neither the name of Texas Instruments Incorporated nor the names of
++ *    its contributors may be used to endorse or promote products derived
++ *    from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
++ * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
++ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
++ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS;
++ * OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
++ * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
++ * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ * --/COPYRIGHT--
++ */
++#ifndef __V4L2_DM36x_IPIPE_H__
++#define __V4L2_DM36x_IPIPE_H__
++
++#include <glib.h>
++#include "gstv4l2src.h"
++
++/* simple check whether the resizer is open */
++#define GST_V4L2_RESIZER_IS_OPEN(v4l2src) \
++  (v4l2src->davinci_resizer_fd > 0)
++
++/* simple check whether the previewer is open */
++#define GST_V4L2_PREVIEWER_IS_OPEN(v4l2src) \
++  (v4l2src->davinci_previewer_fd > 0)
++
++gboolean  gst_v4l2_dm36x_ipipe_open   (GstV4l2Src * v4l2src);
++gboolean  gst_v4l2_dm36x_ipipe_init   (GstV4l2Src * v4l2src);
++gboolean  gst_v4l2_dm36x_ipipe_close  (GstV4l2Src * v4l2src);
++
++#endif /* __V4L2_DM36x_IPIPE_H__ */
++
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2src.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2src.c	2013-02-01 17:12:08.819935860 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2src.c	2013-02-04 09:38:43.490146947 -0600
+@@ -63,16 +63,20 @@
+ #include "gstv4l2vidorient.h"
+ 
+ #include "gst/gst-i18n-plugin.h"
++#include "v4l2_dm36x_ipipe.h"
+ 
+ GST_DEBUG_CATEGORY (v4l2src_debug);
+ #define GST_CAT_DEFAULT v4l2src_debug
+ 
+ #define DEFAULT_PROP_DEVICE   "/dev/video0"
+ 
++#define PROP_DEF_CHAIN_IPIPE        TRUE
++
+ enum
+ {
+   PROP_0,
+   V4L2_STD_OBJECT_PROPS,
++  PROP_CHAIN_IPIPE,
+   PROP_LAST
+ };
+ 
+@@ -159,6 +163,11 @@
+   gst_v4l2_object_install_properties_helper (gobject_class,
+       DEFAULT_PROP_DEVICE);
+ 
++  g_object_class_install_property (gobject_class, PROP_CHAIN_IPIPE,
++      g_param_spec_boolean ("chain-ipipe", "Chain the IPIPE",
++          "Selects if the ipipe will be chained or not",
++          PROP_DEF_CHAIN_IPIPE, G_PARAM_READWRITE));
++
+   /**
+    * GstV4l2Src::prepare-format:
+    * @v4l2src: the v4l2src instance
+@@ -221,6 +230,14 @@
+       V4L2_BUF_TYPE_VIDEO_CAPTURE, DEFAULT_PROP_DEVICE,
+       gst_v4l2_get_input, gst_v4l2_set_input, NULL);
+ 
++  /*Initialize ipipe devices*/
++  v4l2src->davinci_resizer_dev = NULL;
++  v4l2src->davinci_resizer_fd  = -1;
++  v4l2src->davinci_previewer_dev = NULL;
++  v4l2src->davinci_previewer_fd  = -1;
++  /*Chain the dm36x's ipipe by default*/
++  v4l2src->chain_ipipe = PROP_DEF_CHAIN_IPIPE;
++
+   gst_base_src_set_format (GST_BASE_SRC (v4l2src), GST_FORMAT_TIME);
+   gst_base_src_set_live (GST_BASE_SRC (v4l2src), TRUE);
+ }
+@@ -243,6 +260,14 @@
+ {
+   gst_v4l2_object_destroy (v4l2src->v4l2object);
+ 
++  if (v4l2src->davinci_resizer_dev) {
++    g_free (v4l2src->davinci_resizer_dev);
++  }
++
++  if (v4l2src->davinci_previewer_dev) {
++    g_free (v4l2src->davinci_previewer_dev);
++  }
++
+   G_OBJECT_CLASS (parent_class)->finalize ((GObject *) (v4l2src));
+ }
+ 
+@@ -252,10 +277,12 @@
+     guint prop_id, const GValue * value, GParamSpec * pspec)
+ {
+   GstV4l2Src *v4l2src = GST_V4L2SRC (object);
+-
+   if (!gst_v4l2_object_set_property_helper (v4l2src->v4l2object,
+           prop_id, value, pspec)) {
+     switch (prop_id) {
++      case PROP_CHAIN_IPIPE:
++        v4l2src->chain_ipipe = g_value_get_boolean (value);
++        break;
+       default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+         break;
+@@ -272,6 +299,9 @@
+   if (!gst_v4l2_object_get_property_helper (v4l2src->v4l2object,
+           prop_id, value, pspec)) {
+     switch (prop_id) {
++      case PROP_CHAIN_IPIPE:
++        g_value_set_boolean (value, v4l2src->chain_ipipe);
++        break;
+       default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+         break;
+@@ -730,6 +760,16 @@
+ 
+   switch (transition) {
+     case GST_STATE_CHANGE_NULL_TO_READY:
++      if (v4l2src->chain_ipipe){
++        if (gst_v4l2_dm36x_ipipe_open(v4l2src) < 0){
++          GST_ERROR("failed to open IPIPE\n");
++          return GST_STATE_CHANGE_FAILURE;
++        }
++        if (gst_v4l2_dm36x_ipipe_init(v4l2src) < 0){
++          GST_ERROR("failed to initialize IPIPE\n");
++          return GST_STATE_CHANGE_FAILURE;
++        }
++      }
+       /* open the device */
+       if (!gst_v4l2_object_open (obj))
+         return GST_STATE_CHANGE_FAILURE;
+@@ -746,6 +786,11 @@
+       if (!gst_v4l2_object_close (obj))
+         return GST_STATE_CHANGE_FAILURE;
+ 
++      if (gst_v4l2_dm36x_ipipe_close(v4l2src) < 0){
++        GST_ERROR("failed to close IPIPE\n");
++        return GST_STATE_CHANGE_FAILURE;
++      }
++
+       if (v4l2src->probed_caps) {
+         gst_caps_unref (v4l2src->probed_caps);
+         v4l2src->probed_caps = NULL;
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2src.h
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2src.h	2013-02-01 17:12:08.831935862 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2src.h	2013-02-01 17:12:30.695935678 -0600
+@@ -54,6 +54,17 @@
+ {
+   GstPushSrc pushsrc;
+ 
++  /* the resizer device and file descriptor */
++  char *davinci_resizer_dev;
++  gint  davinci_resizer_fd;
++
++  /* the previewer device and file descriptor */
++  char *davinci_previewer_dev;
++  gint  davinci_previewer_fd;
++
++  /* choose if we want the ipipe to be chained or not */
++  gboolean chain_ipipe;
++
+   /*< private >*/
+   GstV4l2Object * v4l2object;
+ 

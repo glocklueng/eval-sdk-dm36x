@@ -1,0 +1,20 @@
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/Makefile	2012-11-19 17:32:04.258227918 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/Makefile	2012-11-19 17:35:19.746729857 -0600
+@@ -38,11 +38,15 @@
+ 
+ all:	
+ 	$(MAKE) -C $(DMAI_INSTALL_DIR)/packages/ti/sdo/dmai
++ifeq ($(CONFIG_PROPRIETARY_TI_DMAI_DEMOS),y)
+ 	$(MAKE) -C $(DMAI_INSTALL_DIR)/packages/ti/sdo/dmai/apps
++endif
+ 
+ install:
+ 	$(MAKE) -C $(DMAI_INSTALL_DIR)/packages/ti/sdo/dmai install
++ifeq ($(CONFIG_PROPRIETARY_TI_DMAI_DEMOS),y)
+ 	$(MAKE) -C $(DMAI_INSTALL_DIR)/packages/ti/sdo/dmai/apps install
++endif
+ 
+ clean:
+ 	$(MAKE) -C $(DMAI_INSTALL_DIR)/packages/ti/sdo/dmai clean

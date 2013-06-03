@@ -1,0 +1,87 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/tvp514x.c
+===================================================================
+--- kernel/linux-2.6.32.orig/drivers/media/video/tvp514x.c	2010-11-09 14:03:38.207503896 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/tvp514x.c	2010-11-10 09:33:09.336272548 -0600
+@@ -535,6 +535,12 @@
+ 	if (err < 0)
+ 		return err;
+ 
++	/* Setup the default input in case s_routing haven't been invoked yet */
++	err = tvp514x_write_reg(sd, REG_INPUT_SEL,
++		decoder->tvp514x_regs[REG_INPUT_SEL].val);
++	if (err < 0)
++		return err;
++
+ 	msleep(LOCK_RETRY_DELAY);
+ 
+ 	/* get the current standard */
+@@ -804,7 +810,7 @@
+ 		err = v4l2_ctrl_query_fill(qctrl, 0, 1, 1, 1);
+ 		break;
+ 	default:
+-		v4l2_err(sd, "invalid control id %d\n", qctrl->id);
++		v4l2_dbg(1, debug, sd, "control id %d not implemented\n", qctrl->id);
+ 		return err;
+ 	}
+ 
+@@ -1323,6 +1329,7 @@
+ {
+ 	struct tvp514x_decoder *decoder;
+ 	struct v4l2_subdev *sd;
++	u8 chip_id_msb, chip_id_lsb, rom_ver;
+ 
+ 	/* Check if the adapter supports the needed features */
+ 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_SMBUS_BYTE_DATA))
+@@ -1333,6 +1340,26 @@
+ 		return -ENODEV;
+ 	}
+ 
++	/* Detect */
++	chip_id_msb = i2c_smbus_read_byte_data(client, REG_CHIP_ID_MSB);
++	chip_id_lsb = i2c_smbus_read_byte_data(client, REG_CHIP_ID_LSB);
++	rom_ver = i2c_smbus_read_byte_data(client, REG_ROM_VERSION);
++
++	v4l2_dbg(1, debug, client,
++		 "chip id detected msb:0x%x lsb:0x%x rom version:0x%x\n",
++		 chip_id_msb, chip_id_lsb, rom_ver);
++	if ((chip_id_msb != TVP514X_CHIP_ID_MSB)
++		|| ((chip_id_lsb != TVP5146_CHIP_ID_LSB)
++		&& (chip_id_lsb != TVP5147_CHIP_ID_LSB))) {
++		/* We didn't read the values we expected, so this must not be
++		 * an TVP5146/47.
++		 */
++		v4l2_err(client, "chip id mismatch msb:0x%x lsb:0x%x\n",
++				chip_id_msb, chip_id_lsb);
++		v4l2_err(client, "tvp514x decoder not detected\n");
++		return -ENODEV;
++	}
++
+ 	decoder = kzalloc(sizeof(*decoder), GFP_KERNEL);
+ 	if (!decoder)
+ 		return -ENOMEM;
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/tvp7002.c
+===================================================================
+--- kernel/linux-2.6.32.orig/drivers/media/video/tvp7002.c	2010-11-09 14:03:29.071323645 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/tvp7002.c	2010-11-09 14:19:35.923390494 -0600
+@@ -1401,6 +1401,7 @@
+ 	struct tvp7002_decoder *decoder;
+ 	struct v4l2_subdev *sd;
+ 	/*int polarity;*/
++	u32 val;
+ 	int err;
+ 
+ 	/* Check if the adapter supports the needed features */
+@@ -1412,6 +1413,13 @@
+ 		return -ENODEV;
+ 	}
+ 
++	/* Lets try with the only value we can */
++	val = i2c_smbus_read_byte_data(client, 0x0);
++	if (val != 0x2){
++		v4l2_err(client,"Unable to detect a valid revision of the tvp7002\n");
++		return -ENODEV;
++	}
++
+ 	decoder = kzalloc(sizeof(*decoder), GFP_KERNEL);
+ 	if (!decoder)
+ 		return -ENOMEM;

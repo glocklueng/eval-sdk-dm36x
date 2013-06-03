@@ -1,0 +1,16 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm365evm.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/include/configs/davinci_dm365evm.h	2011-05-17 17:10:32.692917614 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm365evm.h	2011-05-17 17:10:34.204926294 -0600
+@@ -74,6 +74,11 @@
+ #define CONFIG_SYS_I2C_SPEED		400000
+ #define CONFIG_SYS_I2C_SLAVE		0x10	/* SMBus host address */
+ 
++/* GPIO */
++#define CONFIG_GPIO
++#define CONFIG_DAVINCI_GPIO
++#define CONFIG_CMD_GPIO
++
+ /* SPI */
+ #define CONFIG_CMD_SPI
+ #define CONFIG_DAVINCI_SPI

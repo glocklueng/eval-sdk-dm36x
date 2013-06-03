@@ -1,0 +1,14 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm368leopard.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/include/configs/davinci_dm368leopard.h	2011-05-09 15:04:45.251662079 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm368leopard.h	2011-05-09 15:04:54.675669896 -0600
+@@ -63,6 +63,9 @@
+ #define CONFIG_NET_RETRY_COUNT	10
+ #define CONFIG_NET_MULTI
+ 
++/* Pin Multiplexing */
++#define CONFIG_PIN_MUX
++
+ /* I2C */
+ #define CONFIG_HARD_I2C
+ #define CONFIG_DRIVER_DAVINCI_I2C

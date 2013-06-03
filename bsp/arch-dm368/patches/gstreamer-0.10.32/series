@@ -1,0 +1,3 @@
+allow-reuse-of-gstparse.patch
+0001-add-GstQueryBuffers-query.patch
+0002-gstevent-add-crop-event.patch

@@ -1,0 +1,6 @@
+basic-rrsdk-integration.patch
+Verbose.patch
+correct-dmai-problems.patch
+add-ittiam-encoder-headers.patch
+dmai_prgb_support.patch
+fix_resize.patch

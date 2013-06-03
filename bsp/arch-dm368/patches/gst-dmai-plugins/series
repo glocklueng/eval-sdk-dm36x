@@ -1,0 +1,6 @@
+#add_mp3_support_dmai_plugins.patch
+prgb_tidmaivideosink_support.patch
+#add_facedetect_plugin.patch
+dual-encoder-support.patch
+#add enable-cmem-debug.patch
+enable-cmem-debug.patch

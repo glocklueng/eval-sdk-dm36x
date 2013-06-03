@@ -1,0 +1,15 @@
+#$L$
+# Copyright (C) 2011 Ridgerun (http://www.ridgerun.com). 
+#
+#$L$
+
+UBOOT_BOARD_CONFIG=davinci_dm365evm_config
+
+.PHONY: mach_build mach_post_build mach_clean
+
+mach_build:
+
+mach_post_build:
+
+mach_clean:
+

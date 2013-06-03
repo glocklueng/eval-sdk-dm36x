@@ -1,0 +1,14 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm365evm.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/include/configs/davinci_dm365evm.h	2011-05-17 17:25:12.328974145 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm365evm.h	2011-05-17 17:25:19.156927170 -0600
+@@ -68,6 +68,9 @@
+ #define CONFIG_NET_RETRY_COUNT	10
+ #define CONFIG_NET_MULTI
+ 
++/* Pin Multiplexing */
++#define CONFIG_PIN_MUX
++
+ /* I2C */
+ #define CONFIG_HARD_I2C
+ #define CONFIG_DRIVER_DAVINCI_I2C

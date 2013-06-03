@@ -1,0 +1,1175 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_facedetect.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_facedetect.c	2012-01-24 11:27:39.365707347 -0600
+@@ -0,0 +1,307 @@
++/*
++ * DM365 Face detect driver
++ *
++ * Character device driver for the DM365 Face detect hardware IP
++ *
++ * Copyright (C) 2009 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++//#include <linux/config.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/kernel.h>   /* printk() */
++#include <linux/slab.h>     /* kmalloc() */
++#include <linux/fs.h>       /* everything... */
++#include <linux/errno.h>    /* error codes */
++#include <linux/types.h>    /* size_t */
++#include <linux/cdev.h>     /* Used for struct cdev */
++#include <linux/dma-mapping.h>  /* For class_simple_create */
++#include <linux/interrupt.h>    /* For IRQ_HANDLED and irqreturn_t */
++#include <linux/uaccess.h>  /* For VERIFY_ READ/WRITE/copy_from_user */
++#include <linux/device.h>
++#include <linux/platform_device.h>
++#include <media/davinci/dm365_facedetect.h>
++#include "dm365_facedetect_hw.h"
++
++#define DRIVERNAME  "DM365FACEDETECT"
++
++static struct class *facedetect_class;
++struct device *facedetect_dev;
++
++/* global object of facedetect_device structure */
++static struct facedetect_device facdetectdevice;
++
++/* Keeps track of how many times the device driver has been opened */
++static atomic_t reference_count = ATOMIC_INIT(0);
++
++int facedetect_open(struct inode *inode, struct file *filp)
++{
++    struct facedetect_params_t *config = NULL;
++
++    if (atomic_inc_return(&reference_count) != 1) {
++        dev_err(facedetect_dev,
++            "facedetect_open: device is already openend\n");
++        return -EBUSY;
++    }
++
++    /* allocate memory for a new configuration */
++    config = kmalloc(sizeof(struct facedetect_params_t), GFP_KERNEL);
++    if (!config)
++        return -ENOMEM;
++
++    /*
++     * Store the pointer of facedetect_params_t in private_data member of
++     * file and facedetect_params member of facedetect_device
++     */
++    filp->private_data = config;
++    facdetectdevice.opened = 1;
++
++    return 0;
++}
++
++int facedetect_release(struct inode *inode, struct file *filp)
++{
++    /* get the configuratin from private_date member of file */
++    struct facedetect_params_t *config = filp->private_data;
++    struct facedetect_device *device = &facdetectdevice;
++
++    if (atomic_dec_and_test(&reference_count)) {
++        /* change the device status to available */
++        device->opened = 0;
++    }
++    /* free the memory allocated to configuration */
++    kfree(config);
++
++    /*
++     * Assign null to private_data member of file and params
++     * member of device
++     */
++    filp->private_data = NULL;
++
++    return 0;
++
++}
++
++int facedetect_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
++             unsigned long arg)
++{
++    int ret = 0;
++
++    /* Before decoding check for correctness of cmd */
++    if (_IOC_TYPE(cmd) != FACE_DETECT_IOC_BASE) {
++        dev_dbg(facedetect_dev, "Bad command Value \n");
++        return -1;
++    }
++    if (_IOC_NR(cmd) > FACE_DETECT_IOC_MAXNR) {
++        dev_dbg(facedetect_dev, "Bad command Value\n");
++        return -1;
++    }
++
++    /* Verify accesses */
++    if (_IOC_DIR(cmd) & _IOC_READ)
++        ret = !access_ok(VERIFY_WRITE, (void *)arg, _IOC_SIZE(cmd));
++    else if (_IOC_DIR(cmd) & _IOC_WRITE)
++        ret = !access_ok(VERIFY_READ, (void *)arg, _IOC_SIZE(cmd));
++    if (ret) {
++        dev_err(facedetect_dev, "access denied\n");
++        return -1;  /* error in access */
++    }
++
++    switch (cmd) {
++
++    case FACE_DETECT_SET_HW_PARAM:
++        ret =
++            facedetect_set_hw_param((struct facedetect_params_t *)arg);
++        break;
++
++    case FACE_DETECT_EXECUTE:
++        ret = facedetect_execute((struct facedetect_params_t *)arg);
++        break;
++
++    case FACE_DETECT_SET_BUFFER:
++        ret = facedetect_set_buffer((struct facedetect_params_t *)arg);
++        break;
++
++    case FACE_DETECT_GET_HW_PARAM:
++        ret =
++            facedetect_get_hw_param((struct facedetect_params_t *)arg);
++        break;
++
++    default:
++        ret = -EINVAL;
++        break;
++    }
++    return ret;
++
++}
++
++static void facedetect_platform_release(struct device *device)
++{
++    /* This is called when the reference count goes to zero */
++}
++
++static int __init facedetect_probe(struct device *device)
++{
++    facedetect_dev = device;
++    return 0;
++}
++
++static int facedetect_remove(struct device *device)
++{
++    return 0;
++}
++
++/*
++ * Global variable of type file_operations containing function
++ * pointers of file operations
++ */
++static const struct file_operations facedetect_fops = {
++    .owner = THIS_MODULE,
++    .open = facedetect_open,
++    .release = facedetect_release,
++    .ioctl = facedetect_ioctl,
++};
++
++/* global variable of type cdev to register driver to the kernel */
++static struct cdev cdev;
++
++/* global variable which keeps major and minor number of the driver in it */
++static dev_t dev;
++
++static struct device_driver facedetect_driver = {
++    .name = "dm365_facedetect",
++    .bus = &platform_bus_type,
++    .probe = facedetect_probe,
++    .remove = facedetect_remove,
++};
++
++static struct platform_device facedetect_pt_device = {
++    .name = "dm365_facedetect",
++    .id = 0,
++    .dev = {
++        .release = facedetect_platform_release,
++        }
++};
++
++int __init facedetect_init(void)
++{
++    int result;
++
++    /*
++     * Register the driver in the kernel
++     * Dynmically get the major number for the driver using
++     * alloc_chrdev_region function
++     */
++    result = alloc_chrdev_region(&dev, 0, 1, DRIVERNAME);
++
++    /* if it fails return error */
++    if (result < 0) {
++        dev_dbg(facedetect_dev,
++            "Error registering facedetect character device\n");
++        return -ENODEV;
++    }
++
++    printk(KERN_INFO "facedetect major#: %d, minor# %d\n", MAJOR(dev),
++        MINOR(dev));
++
++    /* initialize cdev with file operations */
++    cdev_init(&cdev, &facedetect_fops);
++
++    cdev.owner = THIS_MODULE;
++    cdev.ops = &facedetect_fops;
++
++    /* add cdev to the kernel */
++    result = cdev_add(&cdev, dev, 1);
++
++    if (result) {
++        unregister_chrdev_region(dev, 1);
++        dev_dbg(facedetect_dev,
++            "Error adding facedetect char device: error no:%d\n",
++            result);
++        return -EINVAL;
++    }
++
++    /* register driver as a platform driver */
++    if (driver_register(&facedetect_driver) != 0) {
++        unregister_chrdev_region(dev, 1);
++        cdev_del(&cdev);
++        return -EINVAL;
++    }
++
++    /* Register the drive as a platform device */
++    if (platform_device_register(&facedetect_pt_device) != 0) {
++        driver_unregister(&facedetect_driver);
++        unregister_chrdev_region(dev, 1);
++        cdev_del(&cdev);
++        return -EINVAL;
++    }
++
++    facedetect_class = class_create(THIS_MODULE, "dm365_facedetect");
++    if (!facedetect_class) {
++        dev_dbg(facedetect_dev,
++            "Error creating facedetect device class\n");
++        driver_unregister(&facedetect_driver);
++        platform_device_unregister(&facedetect_pt_device);
++        unregister_chrdev_region(dev, 1);
++        unregister_chrdev(MAJOR(dev), DRIVERNAME);
++        cdev_del(&cdev);
++        return -EINVAL;
++    }
++    /* register simple device class */
++    device_create(facedetect_class, NULL, dev, NULL,
++                "dm365_facedetect");
++
++    if (facedetect_init_hw_setup() != 0) {
++        dev_dbg(facedetect_dev,
++            "Error initializing facedetect hardware\n");
++        device_destroy(facedetect_class, dev);
++        driver_unregister(&facedetect_driver);
++        platform_device_unregister(&facedetect_pt_device);
++        unregister_chrdev_region(dev, 1);
++        unregister_chrdev(MAJOR(dev), DRIVERNAME);
++        cdev_del(&cdev);
++        return -EINVAL;
++    }
++
++    facedetect_init_interrupt();
++
++    printk(KERN_INFO "facedetect driver registered\n");
++
++    return 0;
++}
++
++void __exit facedetect_cleanup(void)
++{
++    /* remove major number allocated to this driver */
++    unregister_chrdev_region(dev, 1);
++
++    /* Remove platform driver */
++    driver_unregister(&facedetect_driver);
++
++    /* remove simple class device */
++    device_destroy(facedetect_class, dev);
++
++    /* destroy simple class */
++    class_destroy(facedetect_class);
++
++    /* remove platform device */
++    platform_device_unregister(&facedetect_pt_device);
++
++    cdev_del(&cdev);
++
++    /* unregistering the driver from the kernel */
++    unregister_chrdev(MAJOR(dev), DRIVERNAME);
++}
++
++module_init(facedetect_init);
++module_exit(facedetect_cleanup);
++MODULE_LICENSE("GPL");
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_facedetect_hw.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_facedetect_hw.c	2012-01-24 09:45:06.461648231 -0600
+@@ -0,0 +1,428 @@
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/cdev.h>     /* Used for struct cdev */
++#include <linux/dma-mapping.h>  /* For class_simple_create */
++#include <linux/device.h>
++#include <linux/interrupt.h>
++#include <linux/completion.h>
++#include <media/davinci/vpss.h>
++#include <media/davinci/dm365_facedetect.h>
++#include "dm365_facedetect_hw.h"
++
++#define DRIVERNAME  "DM365FACEDETECT"
++
++struct completion fd_complete;
++
++void facedetect_hw_dump_config(void)
++{
++    u32 utemp;
++    printk(KERN_NOTICE "Face Detection Registers\n");
++    printk(KERN_NOTICE
++           "**************************************************\n");
++    printk(KERN_NOTICE "Interface Control Registers \n");
++    utemp = regr_if(FDIF_PID);
++    printk(KERN_NOTICE "FDIF_PID = 0x%x\n", utemp);
++    utemp = regr_if(FDIF_CTRL);
++    printk(KERN_NOTICE "FDIF_CTRL = 0x%x\n", utemp);
++    utemp = regr_if(FDIF_INTEN);
++    printk(KERN_NOTICE "FDIF_INTEN = 0x%x\n", utemp);
++    utemp = regr_if(FDIF_PICADDR);
++    printk(KERN_NOTICE "FDIF_PICADDR = 0x%x\n", utemp);
++    utemp = regr_if(FDIF_WKADDR);
++    printk(KERN_NOTICE "FDIF_WKADDR= 0x%x\n", utemp);
++    utemp = regr_if(FDIF_TESTMON);
++    printk(KERN_NOTICE "FDIF_TESTMON = 0x%x\n", utemp);
++    utemp = regr_if(FD_CTRL);
++    printk(KERN_NOTICE "FD_CTRL = 0x%x\n", utemp);
++    utemp = regr_if(FD_DNUM);
++    printk(KERN_NOTICE "FD_DNUM = 0x%x\n", utemp);
++    utemp = regr_if(FD_DCOND);
++    printk(KERN_NOTICE "FD_DCOND = 0x%x\n", utemp);
++    utemp = regr_if(FD_STARTX);
++    printk(KERN_NOTICE "FD_STARTX = 0x%x\n", utemp);
++    utemp = regr_if(FD_STARTY);
++    printk(KERN_NOTICE "FD_STARTY = 0x%x\n", utemp);
++    utemp = regr_if(FD_SIZEX);
++    printk(KERN_NOTICE "FD_SIZEX = 0x%x\n", utemp);
++    utemp = regr_if(FD_SIZEY);
++    printk(KERN_NOTICE "FD_SIZEY = 0x%x\n", utemp);
++    utemp = regr_if(FD_LHIT);
++    printk(KERN_NOTICE "FD_LHIT = 0x%x\n", utemp);
++
++}
++static struct facedetect_inputdata_t facedetect_default_input_params = {
++
++    (char)0,        /* Enable */
++    (char)1,        /* Interrupt Enable */
++    (unsigned char *)0x0,   /* Input Addr */
++    (unsigned char *)0x0,   /* WorkArea Addr */
++    /* Direction : UP */
++    (unsigned char)FACE_DETECT_DIRECTION_UP,
++    /* Minimum face size 20Pixels */
++    (unsigned char)MINIMUM_FACE_SIZE_20_PIXEL,
++    (unsigned short)0,  /* Image start X */
++    (unsigned short)0,  /* Image start Y */
++    (unsigned short)320,    /* Image Width */
++    (unsigned short)240,    /* Image Height */
++    (unsigned char)5    /* Face detect Threshold value */
++};
++
++static struct facedetect_inputdata_t facedetect_current_input_params;
++
++static irqreturn_t facedetect_isr(int irq, void *device_id)
++{
++    complete(&fd_complete);
++    regw_if(1 << FINISH_CONTROL, FD_CTRL);
++
++    return IRQ_HANDLED;
++}
++
++int facedetect_init_interrupt()
++{
++    init_completion(&fd_complete);
++
++    return 0;
++}
++
++int facedetect_init_hw_setup()
++{
++
++    /* Software reset */
++
++    /* Initialize the other control registers */
++    regw_if(0x000, FD_DNUM);
++    /* Detect direction Up and Minimum face size 20 pixel */
++    regw_if(((facedetect_default_input_params.
++          direction) << 2) | ((facedetect_default_input_params.
++                       minFaceSize) << 0), FD_DCOND);
++    regw_if(facedetect_default_input_params.inputImageStartX, FD_STARTX);
++    regw_if(facedetect_default_input_params.inputImageStartY, FD_STARTY);
++    regw_if(facedetect_default_input_params.inputImageWidth, FD_SIZEX);
++    regw_if(facedetect_default_input_params.inputImageHeight, FD_SIZEY);
++    regw_if(facedetect_default_input_params.ThresholdValue, FD_LHIT);
++
++    regw_if((int)facedetect_default_input_params.inputAddr, FDIF_PICADDR);
++    regw_if((int)facedetect_default_input_params.workAreaAddr, FDIF_WKADDR);
++
++    facedetect_current_input_params.direction =
++        facedetect_default_input_params.direction;
++    facedetect_current_input_params.minFaceSize =
++        facedetect_default_input_params.minFaceSize;
++    facedetect_current_input_params.inputImageStartX =
++        facedetect_default_input_params.inputImageStartX;
++    facedetect_current_input_params.inputImageStartY =
++        facedetect_default_input_params.inputImageStartY;
++    facedetect_current_input_params.inputImageWidth =
++        facedetect_default_input_params.inputImageWidth;
++    facedetect_current_input_params.inputImageHeight =
++        facedetect_default_input_params.inputImageHeight;
++    facedetect_current_input_params.ThresholdValue =
++        facedetect_default_input_params.ThresholdValue;
++    facedetect_current_input_params.inputAddr =
++        facedetect_default_input_params.inputAddr;
++    facedetect_current_input_params.workAreaAddr =
++        facedetect_default_input_params.workAreaAddr;
++    facedetect_current_input_params.intEnable =
++        facedetect_default_input_params.intEnable;
++    facedetect_current_input_params.enable =
++        facedetect_default_input_params.enable;
++    return 0;
++
++}
++
++int facedetect_set_hw_param(struct facedetect_params_t *config)
++{
++    if (!config)
++        return -EINVAL;
++
++    /* Detect direction Up and Minimum face size 20 pixel */
++    facedetect_set_detect_direction(config);
++    facedetect_set_minimum_face_size(config);
++    regw_if(config->inputdata.inputImageStartX, FD_STARTX);
++    regw_if(config->inputdata.inputImageStartY, FD_STARTY);
++    regw_if(config->inputdata.inputImageWidth, FD_SIZEX);
++    regw_if(config->inputdata.inputImageHeight, FD_SIZEY);
++    regw_if(config->inputdata.ThresholdValue, FD_LHIT);
++
++    /* Set the address for the Picture address and Work area */
++    if (facedetect_set_buffer(config) < 0)
++        return -EINVAL;
++
++    facedetect_current_input_params.direction = config->inputdata.direction;
++    facedetect_current_input_params.minFaceSize =
++        config->inputdata.minFaceSize;
++    facedetect_current_input_params.inputImageStartX =
++        config->inputdata.inputImageStartX;
++    facedetect_current_input_params.inputImageStartY =
++        config->inputdata.inputImageStartY;
++    facedetect_current_input_params.inputImageWidth =
++        config->inputdata.inputImageWidth;
++    facedetect_current_input_params.inputImageHeight =
++        config->inputdata.inputImageHeight;
++    facedetect_current_input_params.ThresholdValue =
++        config->inputdata.ThresholdValue;
++    facedetect_current_input_params.inputAddr = config->inputdata.inputAddr;
++    facedetect_current_input_params.workAreaAddr =
++        config->inputdata.workAreaAddr;
++    facedetect_current_input_params.intEnable =
++        facedetect_default_input_params.intEnable;
++    facedetect_current_input_params.enable =
++        facedetect_default_input_params.enable;
++
++    return 0;
++}
++
++int facedetect_get_hw_param(struct facedetect_params_t *config)
++{
++    if (!config)
++        return -EINVAL;
++
++    config->inputdata.direction = facedetect_current_input_params.direction;
++    config->inputdata.minFaceSize =
++        facedetect_current_input_params.minFaceSize;
++    config->inputdata.inputImageStartX =
++        facedetect_current_input_params.inputImageStartX;
++    config->inputdata.inputImageStartY =
++        facedetect_current_input_params.inputImageStartY;
++    config->inputdata.inputImageWidth =
++        facedetect_current_input_params.inputImageWidth;
++    config->inputdata.inputImageHeight =
++        facedetect_current_input_params.inputImageHeight;
++    config->inputdata.ThresholdValue =
++        facedetect_current_input_params.ThresholdValue;
++    config->inputdata.inputAddr = facedetect_current_input_params.inputAddr;
++    config->inputdata.workAreaAddr =
++        facedetect_current_input_params.workAreaAddr;
++    config->inputdata.intEnable = facedetect_current_input_params.intEnable;
++    config->inputdata.enable = facedetect_current_input_params.enable;
++
++    return 0;
++}
++
++int facedetect_set_detect_direction(struct facedetect_params_t *config)
++{
++    unsigned int read_val = 0x000;
++    unsigned int write_val = 0x000;
++
++    read_val = regr_if(FD_DCOND);
++    read_val = read_val & 0x003;
++    switch (config->inputdata.direction) {
++    case FACE_DETECT_DIRECTION_UP:
++        write_val = read_val | 0x000;
++        break;
++
++    case FACE_DETECT_DIRECTION_RIGHT:
++        write_val = read_val | 0x004;
++        break;
++
++    case FACE_DETECT_DIRECTION_LEFT:
++        write_val = read_val | 0x008;
++        break;
++    }
++    regw_if(write_val, FD_DCOND);
++
++    return 0;
++}
++
++int facedetect_set_minimum_face_size(struct facedetect_params_t *config)
++{
++    unsigned int read_val = 0x000;
++    unsigned int write_val = 0x000;
++
++    read_val = regr_if(FD_DCOND);
++    read_val = read_val & 0xC;
++
++    switch (config->inputdata.minFaceSize) {
++    case MINIMUM_FACE_SIZE_20_PIXEL:
++        write_val = read_val | 0x0;
++        break;
++
++    case MINIMUM_FACE_SIZE_25_PIXEL:
++        write_val = read_val | 0x1;
++        break;
++
++    case MINIMUM_FACE_SIZE_32_PIXEL:
++        write_val = read_val | 0x2;
++        break;
++
++    case MINIMUM_FACE_SIZE_40_PIXEL:
++        write_val = read_val | 0x3;
++        break;
++    }
++
++    regw_if(write_val, FD_DCOND);
++
++    return 0;
++}
++
++int facedetect_get_num_faces(struct facedetect_params_t *config)
++{
++    config->outputdata.faceCount = regr_if(FD_DNUM);
++
++    return 0;
++}
++
++int facedetect_get_all_face_detect_positions(struct facedetect_params_t *config)
++{
++    volatile unsigned char loop = 0;
++    volatile unsigned short confidence_size = 0x000;
++
++    for (loop = 0; loop < config->outputdata.faceCount; loop++) {
++        config->outputdata.face_position[loop].resultX =
++            regr_if(FD_CENTERX1 + (loop * OUTPUT_RESULT_OFFSET));
++        config->outputdata.face_position[loop].resultY =
++            regr_if(FD_CENTERY1 + (loop * OUTPUT_RESULT_OFFSET));
++        confidence_size =
++            regr_if(FD_CONFSIZE1 + (loop * OUTPUT_RESULT_OFFSET));
++        config->outputdata.face_position[loop].resultConfidenceLevel =
++            (FACE_DETECT_CONFIDENCE & confidence_size) >> 8;
++        config->outputdata.face_position[loop].resultSize =
++            (FACE_DETECT_SIZE & confidence_size);
++        config->outputdata.face_position[loop].resultAngle =
++            (regr_if(FD_ANGLE1 + (loop * OUTPUT_RESULT_OFFSET))) &
++            0x1FF;
++    }
++
++    return 0;
++
++}
++
++int facedetect_set_buffer(struct facedetect_params_t *config)
++{
++    if ((((int)config->inputdata.inputAddr % 32) != 0)
++        || (((int)config->inputdata.workAreaAddr % 32) != 0))
++        return -EINVAL;
++
++    /* Set the address for the Picture address */
++    regw_if((int)config->inputdata.inputAddr, FDIF_PICADDR);
++
++    /* Set the address for the Work area */
++    regw_if((int)config->inputdata.workAreaAddr, FDIF_WKADDR);
++
++    facedetect_current_input_params.inputAddr = config->inputdata.inputAddr;
++    facedetect_current_input_params.workAreaAddr =
++        config->inputdata.workAreaAddr;
++
++    return 0;
++}
++
++int facedetect_execute(struct facedetect_params_t *config)
++{
++    volatile int cnt = 0;
++
++    /* Enable Face Detection */
++    facedetect_int_enable(1);
++
++    regw_if(1 << SRST_CONTROL, FD_CTRL);
++
++    /* Delay between SW Reset and Run. Need Tuning */
++    for (cnt = 0; cnt < 10000; cnt++)
++        ;
++
++    regw_if(1 << RUN_CONTROL, FD_CTRL);
++
++    facedetect_int_wait(1);
++
++    /* Disable interrupt again */
++    facedetect_int_enable(0);
++
++    facedetect_get_num_faces(config);
++    facedetect_get_all_face_detect_positions(config);
++
++    return 0;
++}
++
++int facedetect_int_enable(char enable)
++{
++    regw_if(enable, FDIF_INTEN);
++
++    if (enable == 1) {
++        if (request_irq
++            (IRQ_DM365_FDIF_INT, facedetect_isr, IRQF_DISABLED, DRIVERNAME,
++             (void *)NULL)) {
++            return -1;
++        }
++    } else if (enable == 0)
++        free_irq(IRQ_DM365_FDIF_INT, (void *)NULL);
++
++    facedetect_current_input_params.intEnable = enable;
++    return 0;
++}
++
++int facedetect_int_clear(char stat_clear)
++{
++    regw_if(0x000, FDIF_INTEN);
++    INIT_COMPLETION(fd_complete);
++    free_irq(IRQ_DM365_FDIF_INT, (void *)NULL);
++    return 0;
++}
++
++int facedetect_int_wait(char stat_wait)
++{
++    /* Waiting for LDC to complete */
++    wait_for_completion_interruptible(&fd_complete);
++    INIT_COMPLETION(fd_complete);
++    return 0;
++}
++
++int facedetect_isbusy(char *status)
++{
++    volatile unsigned int read_val = 0x000;
++
++    read_val = regr_if(FD_CTRL);
++
++    /* Check the Finish control bit */
++    if (0x001 << FINISH_CONTROL & read_val) {
++        *status = FD_STATUS_FREE;
++        regw_if(1 << FINISH_CONTROL, FD_CTRL);
++    } else
++        *status = FD_STATUS_BUSY;
++
++    return 0;
++}
++
++int facedetect_set_start_x(struct facedetect_params_t *config)
++{
++    /* Value should be 0<=STARTX<=160 */
++    regw_if(config->inputdata.inputImageStartX, FD_STARTX);
++
++    return 0;
++}
++
++int facedetect_set_start_y(struct facedetect_params_t *config)
++{
++    /* Value should be 0<=STARTY<=120 */
++    regw_if(config->inputdata.inputImageStartY, FD_STARTY);
++
++    return 0;
++}
++
++int facedetect_set_detection_width(struct facedetect_params_t *config)
++{
++    /*
++     * Operation cannot be guaranteed when neither 160<=SIZEX<=320
++     * nor STARTX+SIZEX<=320 is met
++     */
++    regw_if(config->inputdata.inputImageWidth, FD_SIZEX);
++
++    return 0;
++}
++
++int facedetect_set_detection_height(struct facedetect_params_t *config)
++{
++    /*
++     * Operation cannot be guaranteed when neither 120<=SIZEY<=240
++     * nor STARTY+SIZEY<=240 is met
++     */
++    regw_if(config->inputdata.inputImageWidth, FD_SIZEY);
++
++    return 0;
++}
++
++int facedetect_set_threshold(struct facedetect_params_t *config)
++{
++    /* Threshold value should be between 0 and 9 */
++    regw_if(config->inputdata.ThresholdValue, FD_LHIT);
++
++    return 0;
++}
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_facedetect_hw.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_facedetect_hw.h	2012-01-24 09:38:49.269727253 -0600
+@@ -0,0 +1,275 @@
++#ifndef DM365_FACEDETECT_HW
++#define DM365_FACEDETECT_HW
++
++#define FACEDETECT_IOBASE_ADDR  IO_ADDRESS(0x01c71800)
++
++/* Macro for bit set and clear */
++#define SETBIT(reg, bit)   (reg = ((reg) | ((0x001)<<(bit))))
++#define RESETBIT(reg, bit) (reg = ((reg) & (~(0x001<<(bit)))))
++
++/* Register read/write */
++#define regw_if(val, reg)    __raw_writel(val, FACEDETECT_IOBASE_ADDR + reg)
++#define regr_if(reg)         __raw_readl(reg + FACEDETECT_IOBASE_ADDR)
++
++/* IRQ*/
++#define IRQ_DM365_FDIF_INT    7
++
++/* Control register bits */
++#define SRST_CONTROL   0
++#define RUN_CONTROL    1
++#define FINISH_CONTROL 2
++
++#define FACE_DETECT_SIZE       0x07F
++#define FACE_DETECT_CONFIDENCE 0xF00
++#define OUTPUT_RESULT_OFFSET   16
++
++/* Interface control registers */
++#define FDIF_PID        0x000
++#define FDIF_CTRL       0x004
++#define FDIF_INTEN      0x008
++#define FDIF_PICADDR    0x00C
++#define FDIF_WKADDR     0x010
++#define FDIF_TESTMON    0x014
++
++/* Control registers */
++#define FD_CTRL         0x020
++#define FD_DNUM         0x024
++#define FD_DCOND        0x028
++#define FD_STARTX       0x02C
++#define FD_STARTY       0x030
++#define FD_SIZEX        0x034
++#define FD_SIZEY        0x038
++#define FD_LHIT         0x03C
++
++/* Detection result for face 1 */
++#define FD_CENTERX1     0x100
++#define FD_CENTERY1     0x104
++#define FD_CONFSIZE1    0x108
++#define FD_ANGLE1       0x10C
++
++/* Detection result for face 2 */
++#define FD_CENTERX2     0x110
++#define FD_CENTERY2     0x114
++#define FD_CONFSIZE2    0x118
++#define FD_ANGLE2       0x11C
++
++/* Detection result for face 3 */
++#define FD_CENTERX3     0x120
++#define FD_CENTERY3     0x124
++#define FD_CONFSIZE3    0x128
++#define FD_ANGLE3       0x12C
++
++/* Detection result for face 4 */
++#define FD_CENTERX4     0x130
++#define FD_CENTERY4     0x134
++#define FD_CONFSIZE4    0x138
++#define FD_ANGLE4       0x13C
++
++/* Detection result for face 5 */
++#define FD_CENTERX5     0x140
++#define FD_CENTERY5     0x144
++#define FD_CONFSIZE5    0x148
++#define FD_ANGLE5       0x14C
++
++/* Detection result for face 6 */
++#define FD_CENTERX6     0x150
++#define FD_CENTERY6     0x154
++#define FD_CONFSIZE6    0x158
++#define FD_ANGLE6       0x15C
++
++/* Detection result for face 7 */
++#define FD_CENTERX7     0x160
++#define FD_CENTERY7     0x164
++#define FD_CONFSIZE7    0x168
++#define FD_ANGLE7       0x16C
++
++/* Detection result for face 8 */
++#define FD_CENTERX8     0x170
++#define FD_CENTERY8     0x174
++#define FD_CONFSIZE8    0x178
++#define FD_ANGLE8       0x17C
++
++/* Detection result for face 9 */
++#define FD_CENTERX9     0x180
++#define FD_CENTERY9     0x184
++#define FD_CONFSIZE9    0x188
++#define FD_ANGLE9       0x18C
++
++/* Detection result for face 10 */
++#define FD_CENTERX10    0x190
++#define FD_CENTERY10    0x194
++#define FD_CONFSIZE10   0x198
++#define FD_ANGLE10      0x19C
++
++/* Detection result for face 11 */
++#define FD_CENTERX11    0x1A0
++#define FD_CENTERY11    0x1A4
++#define FD_CONFSIZE11   0x1A8
++#define FD_ANGLE11      0x1AC
++
++/* Detection result for face 12 */
++#define FD_CENTERX12    0x1B0
++#define FD_CENTERY12    0x1B4
++#define FD_CONFSIZE12   0x1B8
++#define FD_ANGLE12      0x1BC
++
++/* Detection result for face 13 */
++#define FD_CENTERX13    0x1C0
++#define FD_CENTERY13    0x1C4
++#define FD_CONFSIZE13   0x1C8
++#define FD_ANGLE13      0x1CC
++
++/* Detection result for face 14 */
++#define FD_CENTERX14    0x1D0
++#define FD_CENTERY14    0x1D4
++#define FD_CONFSIZE14   0x1D8
++#define FD_ANGLE14      0x1DC
++
++/* Detection result for face 15 */
++#define FD_CENTERX15    0x1E0
++#define FD_CENTERY15    0x1E4
++#define FD_CONFSIZE15   0x1E8
++#define FD_ANGLE15      0x1EC
++
++/* Detection result for face 16 */
++#define FD_CENTERX16    0x1F0
++#define FD_CENTERY16    0x1F4
++#define FD_CONFSIZE16   0x1F8
++#define FD_ANGLE16      0x1FC
++
++/* Detection result for face 17 */
++#define FD_CENTERX17    0x200
++#define FD_CENTERY17    0x204
++#define FD_CONFSIZE17   0x208
++#define FD_ANGLE17      0x20C
++
++/* Detection result for face 18 */
++#define FD_CENTERX18    0x210
++#define FD_CENTERY18    0x214
++#define FD_CONFSIZE18   0x218
++#define FD_ANGLE18      0x21C
++
++/* Detection result for face 19 */
++#define FD_CENTERX19    0x220
++#define FD_CENTERY19    0x224
++#define FD_CONFSIZE19   0x228
++#define FD_ANGLE19      0x22C
++
++/* Detection result for face 20 */
++#define FD_CENTERX20    0x230
++#define FD_CENTERY20    0x234
++#define FD_CONFSIZE20   0x238
++#define FD_ANGLE20      0x23C
++
++/* Detection result for face 21 */
++#define FD_CENTERX21    0x240
++#define FD_CENTERY21    0x244
++#define FD_CONFSIZE21   0x248
++#define FD_ANGLE21      0x24C
++
++/* Detection result for face 22 */
++#define FD_CENTERX22    0x250
++#define FD_CENTERY22    0x254
++#define FD_CONFSIZE22   0x258
++#define FD_ANGLE22      0x25C
++
++/* Detection result for face 23 */
++#define FD_CENTERX23    0x260
++#define FD_CENTERY23    0x264
++#define FD_CONFSIZE23   0x268
++#define FD_ANGLE23      0x26C
++
++/* Detection result for face 24 */
++#define FD_CENTERX24    0x270
++#define FD_CENTERY24    0x274
++#define FD_CONFSIZE24   0x278
++#define FD_ANGLE24      0x27C
++
++/* Detection result for face 25 */
++#define FD_CENTERX25    0x280
++#define FD_CENTERY25    0x284
++#define FD_CONFSIZE25   0x288
++#define FD_ANGLE25      0x28C
++
++/* Detection result for face 26 */
++#define FD_CENTERX26    0x290
++#define FD_CENTERY26    0x294
++#define FD_CONFSIZE26   0x298
++#define FD_ANGLE26      0x29C
++
++/* Detection result for face 27 */
++#define FD_CENTERX27    0x2A0
++#define FD_CENTERY27    0x2A4
++#define FD_CONFSIZE27   0x2A8
++#define FD_ANGLE27      0x2AC
++
++/* Detection result for face 28 */
++#define FD_CENTERX28    0x2B0
++#define FD_CENTERY28    0x2B4
++#define FD_CONFSIZE28   0x2B8
++#define FD_ANGLE28      0x2BC
++
++/* Detection result for face 29 */
++#define FD_CENTERX29    0x2C0
++#define FD_CENTERY29    0x2C4
++#define FD_CONFSIZE29   0x2C8
++#define FD_ANGLE29      0x2CC
++
++/* Detection result for face 30 */
++#define FD_CENTERX30    0x2D0
++#define FD_CENTERY30    0x2D4
++#define FD_CONFSIZE30   0x2D8
++#define FD_ANGLE30      0x2DC
++
++/* Detection result for face 31 */
++#define FD_CENTERX31    0x2E0
++#define FD_CENTERY31    0x2E4
++#define FD_CONFSIZE31   0x2E8
++#define FD_ANGLE31      0x2EC
++
++/* Detection result for face 32 */
++#define FD_CENTERX32    0x2F0
++#define FD_CENTERY32    0x2F4
++#define FD_CONFSIZE32   0x2F8
++#define FD_ANGLE32      0x2FC
++
++/* Detection result for face 33 */
++#define FD_CENTERX33    0x300
++#define FD_CENTERY33    0x304
++#define FD_CONFSIZE33   0x308
++#define FD_ANGLE33      0x30C
++
++/* Detection result for face 34 */
++#define FD_CENTERX34    0x310
++#define FD_CENTERY34    0x314
++#define FD_CONFSIZE34   0x318
++#define FD_ANGLE34      0x31C
++
++/* Detection result for face 35 */
++#define FD_CENTERX35    0x320
++#define FD_CENTERY35    0x324
++#define FD_CONFSIZE35   0x328
++#define FD_ANGLE35      0x32C
++
++int facedetect_init_hw_setup(void);
++int facedetect_set_hw_param(struct facedetect_params_t *);
++int facedetect_get_hw_param(struct facedetect_params_t *);
++int facedetect_execute(struct facedetect_params_t *);
++int facedetect_set_buffer(struct facedetect_params_t *);
++
++int facedetect_get_status(char);
++int facedetect_int_wait(char);
++int facedetect_int_enable(char);
++int facedetect_isbusy(char *);
++int facedetect_set_detect_direction(struct facedetect_params_t *);
++int facedetect_set_minimum_face_size(struct facedetect_params_t *);
++int facedetect_set_start_x(struct facedetect_params_t *);
++int facedetect_set_start_y(struct facedetect_params_t *);
++int facedetect_set_detection_width(struct facedetect_params_t *);
++int facedetect_set_detection_height(struct facedetect_params_t *);
++int facedetect_set_threshold(struct facedetect_params_t *);
++int facedetect_init_interrupt(void);
++int facedetect_int_clear(char);
++int facedetect_int_wait(char);
++
++#endif /* DM365_FACEDETECT_HW */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/Kconfig	2012-01-24 09:38:39.397658770 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/Kconfig	2012-01-24 09:38:49.289764686 -0600
+@@ -1195,6 +1195,13 @@
+         help
+                 DaVinci CIR Driver.
+ 
++config DM365_FACEDETECT
++	depends on ARCH_DAVINCI && ARCH_DAVINCI_DM365
++	tristate "DM365 Face Detect"
++	default y
++	help
++		DM365 Face Detect driver
++
+ config DM365_ADC
+ 	depends on ARCH_DAVINCI && ARCH_DAVINCI_DM365
+ 	tristate "DM365 ADC"
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/Makefile	2012-01-24 09:38:39.409649661 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/Makefile	2012-01-24 09:38:49.289764686 -0600
+@@ -131,6 +131,9 @@
+ 					dm365_ipipe_hw.o dm3xx_ipipe.o
+ obj-$(CONFIG_DM365_IPIPE)	+= dm365_imp.o
+ 
++dm365_facedetect_driver-objs	:= dm365_facedetect_hw.o dm365_facedetect.o
++obj-$(CONFIG_DM365_FACEDETECT)	+=  dm365_facedetect_driver.o
++
+ imp_prev_driver-objs		:= imp_previewer.o
+ imp_rsz_driver-objs		:= imp_resizer.o
+ obj-$(CONFIG_DM355_IPIPE)	+= imp_common.o
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/dm365_facedetect.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/dm365_facedetect.h	2012-01-24 09:38:49.289764686 -0600
+@@ -0,0 +1,98 @@
++#ifndef DM365_FACEDETECT
++#define DM365_FACEDETECT
++
++#include <linux/ioctl.h>
++
++/* Brief Face detect direction settings */
++#define FACE_DETECT_DIRECTION_UP    0
++#define FACE_DETECT_DIRECTION_RIGHT 1
++#define FACE_DETECT_DIRECTION_LEFT  2
++
++/* Brief Face detect minimum face size settings */
++#define MINIMUM_FACE_SIZE_20_PIXEL  0
++#define MINIMUM_FACE_SIZE_25_PIXEL  1
++#define MINIMUM_FACE_SIZE_32_PIXEL  2
++#define MINIMUM_FACE_SIZE_40_PIXEL  3
++
++/*
++ * Brief Minimum Work Area Size that need to be allocated by application
++ * as a contiguous buffer
++ */
++#define MIN_WORKAREA_SIZE   (13200 * 4)
++
++/* Brief Face detect status */
++typedef enum fd_status {
++    FD_STATUS_FREE = 0,
++    FD_STATUS_BUSY = 1
++} fd_status_t;
++
++/* Brief Face detection sensor input parameters */
++struct facedetect_inputdata_t {
++    char enable;        /* Facedetect: TRUE: Enable, FALSE: Disable */
++    char intEnable;     /* Interrupt: TRUE: Enable, FALSE: Disable */
++    unsigned char *inputAddr;   /* Picture data address in SDRAM */
++    unsigned char *workAreaAddr;    /* Work area address in SDRAM */
++    unsigned char direction;    /* Direction : UP, RIGHT, LEFT */
++    unsigned char minFaceSize;  /* Min face size 20,25,32,30 Pixels */
++    unsigned short inputImageStartX;    /* Image start X */
++    unsigned short inputImageStartY;    /* Image start Y */
++    unsigned short inputImageWidth;     /* Image Width */
++    unsigned short inputImageHeight;    /* Image Height */
++    unsigned char ThresholdValue;   /* Face detect Threshold value */
++};
++
++/* Brief Face detection sensor face detect position */
++struct facedetect_position_t {
++    unsigned short resultX;
++    unsigned short resultY;
++    unsigned short resultConfidenceLevel;
++    unsigned short resultSize;
++    unsigned short resultAngle;
++};
++
++/* Brief Face detection sensor output parameters */
++struct facedetect_outputdata_t {
++    struct facedetect_position_t face_position[35];
++    unsigned char faceCount;
++};
++
++/* Brief Face detection sensor input and output parameters */
++struct facedetect_params_t {
++    struct facedetect_inputdata_t inputdata;
++    struct facedetect_outputdata_t outputdata;
++};
++
++/* Brief Device structure keeps track of global information */
++struct facedetect_device {
++    struct facedetect_params_t facedetect_params;
++    unsigned char opened;   /* state of the device */
++};
++
++/* ioctls definition */
++#define FACE_DETECT_IOC_BASE        'F'
++#define FACE_DETECT_SET_HW_PARAM    _IOW(FACE_DETECT_IOC_BASE, 0, \
++                        struct facedetect_params*)
++#define FACE_DETECT_EXECUTE     _IOW(FACE_DETECT_IOC_BASE, 1, \
++                        struct facedetect_params*)
++#define FACE_DETECT_SET_BUFFER      _IOW(FACE_DETECT_IOC_BASE, 2, \
++                        struct facedetect_params*)
++#define FACE_DETECT_GET_HW_PARAM    _IOWR(FACE_DETECT_IOC_BASE, 3, \
++                        struct facedetect_params*)
++
++#define FACE_DETECT_IOC_MAXNR       4
++
++#ifdef __KERNEL__
++
++struct inode;
++struct file;
++
++/* function definition for character driver interface functions */
++int facedetect_init(void);
++void facedetect_cleanup(void);
++int facedetect_open(struct inode *inode, struct file *);
++int facedetect_release(struct inode *inode, struct file *);
++int facedetect_ioctl(struct inode *inode, struct file *, unsigned int,
++             unsigned long);
++
++#endif  /* __KERNEL__ */
++#endif  /* DM365_FACEDETECT */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpss.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpss.c	2012-01-24 09:38:39.437866331 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpss.c	2012-01-24 09:38:49.309647632 -0600
+@@ -626,8 +626,8 @@
+ 		isp5_write((isp5_read(0x8) | 0x00000002), 0x8);
+ 		/* INTSEL1 => AF_INT | IPIPE_INT_BSC | ISF_INT1 | ISF_INT0 */
+ 		isp5_write((isp5_read(0x10) | 0x0b070100), 0x10);
+-		/* INTSEL2 => FREE | AEW_INT | RESERVED | RSZ_INT_REG */
+-		isp5_write((isp5_read(0x14) | 0x1f0a0f0d), 0x14);
++		/* INTSEL2 => FDIF_INT | AEW_INT | RESERVED | RSZ_INT_REG */
++		isp5_write((isp5_read(0x14) | 0x130a0f0d), 0x14);
+ 		/* INTSEL3 => VENC_INT */
+ 		isp5_write((isp5_read(0x18) | 0x00000015), 0x18);
+ 		/* EVTSEL  => No event selected */

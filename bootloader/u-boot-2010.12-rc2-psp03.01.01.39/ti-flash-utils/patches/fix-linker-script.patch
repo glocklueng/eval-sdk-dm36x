@@ -1,0 +1,13 @@
+Index: ti-flash-utils/src/DM36x/GNU/ubl/ubl.lds
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/GNU/ubl/ubl.lds	2013-05-14 14:24:24.142628453 -0600
++++ ti-flash-utils/src/DM36x/GNU/ubl/ubl.lds	2013-05-14 14:26:48.495178963 -0600
+@@ -38,7 +38,7 @@
+     *(.boot)
+     . = ALIGN(4);
+   }
+-  .text    : AT ( LOADADDR(.boot) + SIZEOF(.boot) )
++  .text    : /* AT ( LOADADDR(.boot) + SIZEOF(.boot) ) */
+   {
+     *(.text)
+     . = ALIGN(4);

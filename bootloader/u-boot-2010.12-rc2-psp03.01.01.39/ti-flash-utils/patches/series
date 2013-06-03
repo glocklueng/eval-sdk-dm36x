@@ -1,0 +1,9 @@
+rrsdk-integration.patch
+add-missing-div-functions.patch
+fix-mmcsd-compilation.patch
+fix-linker-script.patch
+fast-boot.patch
+fix-ecc-error-correction-bug.patch
+check-badblock-markers-while-loading-uboot.patch
+memory-test.patch
+ubl-dump-registers.patch

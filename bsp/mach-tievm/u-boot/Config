@@ -1,0 +1,11 @@
+config UBOOT_NAND_FLASH_MEMORY
+	bool
+	default y
+
+#config UBOOT_USBD
+#	bool
+#	default y
+
+config UBOOT_NETWORKING
+	bool
+	default y

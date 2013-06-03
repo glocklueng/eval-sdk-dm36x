@@ -1,0 +1,15 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/config.mk
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/config.mk	2011-04-01 11:42:45.850529167 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/config.mk	2011-04-01 11:45:17.106464319 -0600
+@@ -170,6 +170,10 @@
+ CPPFLAGS += -DCONFIG_SYS_TEXT_BASE=$(CONFIG_SYS_TEXT_BASE)
+ endif
+ 
++ifneq ($(EXTRA_CPPFLAGS),)
++CPPFLAGS += $(EXTRA_CPPFLAGS)
++endif
++
+ ifneq ($(RESET_VECTOR_ADDRESS),)
+ CPPFLAGS += -DRESET_VECTOR_ADDRESS=$(RESET_VECTOR_ADDRESS)
+ endif

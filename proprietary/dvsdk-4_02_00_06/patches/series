@@ -1,0 +1,6 @@
+no-dmai-apps.patch
+skip_SysFs_setup.patch
+fix-nested-externs.patch
+build-codec-engine.patch
+cmem-memory-register-lock.patch
+SemMP-fix.patch

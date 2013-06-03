@@ -1,0 +1,28 @@
+Index: ti-flash-utils/src/Common/ubl/src/nandboot.c
+===================================================================
+--- ti-flash-utils.orig/src/Common/ubl/src/nandboot.c	2013-05-14 14:26:48.547176278 -0600
++++ ti-flash-utils/src/Common/ubl/src/nandboot.c	2013-05-14 14:26:48.575174831 -0600
+@@ -160,9 +160,21 @@
+   block = gNandBoot.block;
+   page = gNandBoot.page;
+ 
+-    // Perform the actual copying of the application from NAND to RAM
++  /* 
++   * Check if the block we read is marked as bad, this isn't common
++   * since we check if the block is bad when we flash U-boot on the
++   * NAND, but it doesn't hurt.
++   */
++   readError = NAND_badBlockCheck(hNandInfo, block);
++   if(readError != E_PASS) {
++       DEBUG_printString("..but this block is marked as bad. Searching other blocks...\r\n");
++       blockNum++;
++       goto NAND_startAgain;
++   }
++
++  // Perform the actual copying of the application from NAND to RAM
+   for(i=0;i<gNandBoot.numPage;i++) {
+-      // if page goes beyond max number of pages increment block number and reset page number
++    // if page goes beyond max number of pages increment block number and reset page number
+     if(page >= hNandInfo->pagesPerBlock) {
+       page = 0;
+       block++;

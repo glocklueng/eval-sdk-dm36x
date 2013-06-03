@@ -1,0 +1,126 @@
+Index: dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/Makefile
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/Makefile	2013-04-24 09:19:39.431028468 -0600
+@@ -0,0 +1,49 @@
++# Codec Engine Makefile
++#    http://processors.wiki.ti.com/index.php/Rebuilding_Codec_Engine
++
++include ../Rules.make
++
++# set the location for packages
++PACKAGE_DIR  = $(CE_INSTALL_DIR)/packages
++
++# Set XDCPATH to contain necessary repositories.
++XDCPATH = $(CURDIR);$(XDAIS_INSTALL_DIR)/packages;$(FC_INSTALL_DIR)/packages;$(BIOS_INSTALL_DIR)/packages;$(CMEM_INSTALL_DIR)/packages;$(LINK_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/cetools/packages;$(BIOSUTILS_INSTALL_DIR)/packages;$(LPM_INSTALL_DIR)/packages
++
++# Set your XDC executable command
++# Note that XDCBUILDCFG must point at the config.bld file created above
++XDC = $(XDC_INSTALL_DIR)/xdc XDCBUILDCFG=$(CE_INSTALL_DIR)/packages/config.bld
++
++# Conditionally, you can create verbose build output
++XDCOPTIONS=v
++
++ifeq ($(PLATFORM),dm365)
++	PLATFORM_XDC = ti.platforms.evmDM365
++endif
++ifeq ($(PLATFORM),dm3730)
++	PLATFORM_XDC = ti.platforms.evm3530
++endif
++ifeq ($(PLATFORM),)
++	$(error There is no PLATFORM definition, please add it)
++endif
++
++export XDCOPTIONS
++export XDCPATH
++export CSTOOL_DIR
++export PLATFORM_XDC
++
++######################################################
++## Shouldnt have to modify anything below this line ##
++######################################################
++
++all: .all-packages
++
++# This recursively locates all packages in the PACKAGE_DIR# directory, builds
++# and releases them
++.all-packages:
++	$(XDC) -PR $(PACKAGE_DIR)
++
++# This recursively cleans all packages in the PACKAGE_DIR# directory
++clean: clean-packages
++
++clean-packages:
++	$(XDC) clean -PR $(PACKAGE_DIR)
+Index: dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/packages/config.bld
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/packages/config.bld	2013-04-17 13:15:44.971906677 -0600
+@@ -0,0 +1,67 @@
++
++/* location of your C6000 codegen tools */
++var codegen = "" + java.lang.System.getenv("CODEGEN_INSTALL_DIR");
++
++/* Verify that PLATFORM_XDC was set as an environment variable */
++var xdcplat = "" + java.lang.System.getenv("PLATFORM_XDC");
++if (xdcplat=="null" || xdcplat==""){
++    print("Warning: PLATFORM_XDC not found. Verify that PLATFORM_XDC "
++        + "is set correctly in Platform.xdc.");
++}
++
++var C6X = xdc.useModule('ti.targets.C64P');
++C6X.rootDir = codegen;
++C6X.platform = xdcplat;
++
++/* User passes in $(CROSS_COMPILE) where $(CROSS_COMPILE)gcc is their compiler
++   Then the TOOLDIR and LONGNAME are derived based on a regex of CROSS_COMPILE
++*/
++var crosscompile = "" + java.lang.System.getenv("CROSS_COMPILE");
++
++var tooldir = "";
++var longName = "";
++
++/* Search CROSS_COMPILE for bin/ If only 1 bin/ is found, set the tooldir to
++   the path prior to bin/ and the prefix to "bin/" + remainder of path,
++   else leave the tooldir as "" and set the LONGNAME to the full CROSS_COMPILE
++   path
++*/
++var regex = new RegExp("bin/");
++var find = crosscompile.split( regex );
++
++if (find[0]!=crosscompile && find.length==2) {
++    tooldir = find[0];
++    longName = "bin/" + find[1] + "gcc";
++} else {
++    longName = crosscompile + "gcc";
++}
++
++/* location of the GCC Arm9 tools */
++var GCArmv5T = xdc.useModule('gnu.targets.arm.GCArmv5T');
++GCArmv5T.LONGNAME = longName;
++GCArmv5T.platform = java.lang.System.getenv("PLATFORM_XDC");
++GCArmv5T.rootDir = tooldir;
++GCArmv5T.ccOpts.prefix += " -Wall -fno-strict-aliasing ";  /* extra compiler opts */
++GCArmv5T.lnkOpts.suffix =                                  /* extra linker opts */
++        GCArmv5T.lnkOpts.suffix.replace("-lstdc++", "");
++GCArmv5T.lnkOpts.suffix += " -lpthread ";
++
++GCArmv5T.platforms = [
++   "ti.platforms.evmDM365"                                  /* DM36x processor */
++];
++
++/* remove a few unused profiles to speed up the build */
++delete GCArmv5T.profiles["coverage"];
++delete GCArmv5T.profiles["profile"];
++
++Build.targets = [
++];
++
++Build.targets.$add(GCArmv5T);
++
++/*
++ * Add this libvers.xdt template to each package being built to auto-generate
++ * symbols used internally to determine compatibility between SW running on
++ * different devices.
++ */
++Pkg.libTemplate = "ti/sdo/ce/utils/libvers.xdt";

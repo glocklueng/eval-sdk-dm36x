@@ -1,0 +1,39 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm365evm.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/include/configs/davinci_dm365evm.h	2011-06-03 15:13:11.666812477 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm365evm.h	2011-06-03 15:16:19.207436641 -0600
+@@ -186,18 +186,29 @@
+ 
+ #if defined(CONFIG_MMC) && !defined(CONFIG_ENV_IS_IN_NAND)
+ #define CONFIG_CMD_ENV
+-#define CONFIG_ENV_SIZE		(16 << 10)	/* 16 KiB */
+-#define CONFIG_ENV_OFFSET	(51 << 9)	/* Sector 51 */
+-#define CONFIG_ENV_IS_IN_MMC
+-#undef CONFIG_ENV_IS_IN_FLASH
+ #endif
+ 
+ #define CONFIG_BOOTDELAY	3
+-#define CONFIG_BOOTCOMMAND	"if mmc rescan 0; then if fatload mmc 0 0x80600000 boot.scr; then source 0x80600000; else fatload mmc 0 0x80700000 uImage; bootm 80700000; fi; fi"
+ #define CONFIG_BOOTARGS \
+ 		"console=ttyS0,115200n8 " \
+ 		"root=/dev/mmcblk0p2 rw rootwait ip=off"
+ 
++#define CONFIG_EXTRA_ENV_SETTINGS \
++	"loadaddr=0x82000000\0" \
++	"loadbootenv=fatload mmc 0 ${loadaddr} uEnv.txt\0" \
++	"importbootenv=echo Importing environment from mmc ...; env import -t ${loadaddr} ${filesize}\0" \
++	"loaduimage=fatload mmc 0 ${loadaddr} uImage\0"
++
++#define CONFIG_BOOTCOMMAND \
++	"if mmc rescan 0 ; then " \
++				"if run loadbootenv ; then " \
++						"run importbootenv ; " \
++							"if test -n ${uenvcmd} ; then " \
++								"run uenvcmd; " \
++							"fi ;" \
++				"fi ;" \
++	"fi"
++
+ #define CONFIG_CMDLINE_EDITING
+ #define CONFIG_VERSION_VARIABLE
+ #define CONFIG_TIMESTAMP

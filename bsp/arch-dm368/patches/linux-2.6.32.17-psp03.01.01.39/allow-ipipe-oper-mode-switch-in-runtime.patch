@@ -1,0 +1,94 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_resizer.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_resizer.c	2011-12-14 10:45:42.292473423 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_resizer.c	2011-12-14 10:46:22.744910073 -0600
+@@ -241,6 +241,9 @@
+ 				goto ERROR;
+ 			}
+ 
++			imp_hw_if->set_resize_oper_mode(user_mode);
++			mode = imp_hw_if->get_resize_oper_mode();
++
+ 			if (user_mode != mode) {
+ 				dev_err(rsz_device,
+ 					"Operation mode doesn't match"
+@@ -248,7 +251,6 @@
+ 				ret = -EINVAL;
+ 				goto ERROR;
+ 			}
+-
+ 			ret = mutex_lock_interruptible(&(rsz_conf_chan->lock));
+ 			if (!ret) {
+ 				rsz_conf_chan->mode = mode;
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_hw_if.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_hw_if.h	2011-12-14 10:45:42.308472877 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_hw_if.h	2011-12-14 10:46:22.744910073 -0600
+@@ -58,6 +58,8 @@
+ 	unsigned int (*get_preview_oper_mode) (void);
+ 	/* get resize operation mode */
+ 	unsigned int (*get_resize_oper_mode) (void);
++	void (*set_resize_oper_mode) (unsigned int mode);
++	void (*set_preview_oper_mode) (unsigned int mode);
+ 	/* check if hw is busy in continuous mode.
+ 	 * Used for checking if hw is used by ccdc driver in
+ 	 * continuous mode. If streaming is ON, this will be
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c	2011-12-14 10:45:42.280475300 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c	2011-12-14 10:59:16.580589468 -0600
+@@ -70,7 +70,6 @@
+ 
+ /* Operation mode of image processor (imp) */
+ static u32 oper_mode = IMP_MODE_SINGLE_SHOT;
+-module_param(oper_mode, uint, S_IRUGO);
+ /* enable/disable serializer */
+ static u32 en_serializer;
+ module_param(en_serializer, uint, S_IRUGO);
+@@ -358,6 +357,7 @@
+ 						    int index);
+ static unsigned int bsc_get_state(void);
+ static unsigned int prev_get_oper_mode(void);
++static void  prev_set_oper_mode(unsigned int);
+ static unsigned int ipipe_get_oper_state(void);
+ static void ipipe_set_oper_state(unsigned int state);
+ static unsigned int ipipe_rsz_chain_state(void);
+@@ -458,6 +458,8 @@
+ 	.get_bsc_state = bsc_get_state,
+ 	.get_preview_oper_mode = prev_get_oper_mode,
+ 	.get_resize_oper_mode = prev_get_oper_mode,
++	.set_resize_oper_mode = prev_set_oper_mode,
++	.set_preview_oper_mode = prev_set_oper_mode,
+ 	.get_hw_state = ipipe_get_oper_state,
+ 	.set_hw_state = ipipe_set_oper_state,
+ 	.resizer_chain = ipipe_rsz_chain_state,
+@@ -2372,6 +2374,13 @@
+ 	return ((bsc.en & bsc.col_en) | (bsc.en & bsc.row_en));
+ }
+ 
++static void prev_set_oper_mode (unsigned int mode)
++{
++    if ((oper_state.rsz_config_state == STATE_NOT_CONFIGURED) &&
++       (oper_state.prev_config_state == STATE_NOT_CONFIGURED)){
++        oper_mode = mode;
++    }
++}
+ static unsigned int prev_get_oper_mode(void)
+ {
+ 	return oper_mode;
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_previewer.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_previewer.c	2011-12-14 10:57:13.452477324 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_previewer.c	2011-12-14 10:58:33.460408223 -0600
+@@ -218,7 +218,10 @@
+ 				ret = -EINVAL;
+ 				goto ERROR;
+ 			}
+-
++
++			imp_hw_if->set_preview_oper_mode(user_mode);
++			mode = imp_hw_if->get_preview_oper_mode();
++
+ 			if (user_mode != mode) {
+ 				dev_err(prev_dev,
+ 					"Operation mode doesn't match"

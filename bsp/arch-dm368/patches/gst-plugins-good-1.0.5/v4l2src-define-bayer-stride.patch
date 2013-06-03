@@ -1,0 +1,16 @@
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2object.c	2012-10-25 04:55:59.000000000 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.c	2013-01-31 09:29:16.661229499 -0600
+@@ -1521,6 +1521,11 @@
+       if (!gst_structure_get_fraction (structure, "framerate", &info->fps_n,
+               &info->fps_d))
+         goto no_framerate;
++
++#ifdef V4L2_PIX_FMT_SBGGR8
++      if (fourcc == V4L2_PIX_FMT_SBGGR8)
++        info->stride[0] = info->width;
++#endif
+     }
+   }
+ 

@@ -1,0 +1,18 @@
+Index: gst-dmai-plugins/src/src/dm365.cfg
+===================================================================
+--- gst-dmai-plugins.orig/src/src/dm365.cfg	2013-01-18 15:49:12.827482494 -0600
++++ gst-dmai-plugins/src/src/dm365.cfg	2013-01-18 15:50:45.491484594 -0600
+@@ -91,6 +91,13 @@
+ 
+ var CMEM = xdc.useModule('ti.sdo.linuxutils.cmem.CMEM');
+ 
++var cmemdebug = "" + java.lang.System.getenv("CONFIG_PROPRIETARY_TI_GST_CMEM_DEBUG");
++if (cmemdebug == "y") {
++    print ("Building with CMEM debug");
++    CMEM.debug = true;
++}
++
++
+ /* Uncomment these lines if you wish to debug FC and enable FC trace */
+  
+ /*

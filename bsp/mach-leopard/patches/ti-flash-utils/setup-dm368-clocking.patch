@@ -1,0 +1,204 @@
+Index: ti-flash-utils/src/DM36x/GNU/ubl/build/makefile
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/GNU/ubl/build/makefile	2011-03-24 15:18:19.000000000 -0600
++++ ti-flash-utils/src/DM36x/GNU/ubl/build/makefile	2013-05-14 14:32:52.340382538 -0600
+@@ -21,7 +21,7 @@
+ SOURCES=$(PROGRAM).c boot.c selfcopy.c uartboot.c device.c debug.c uart.c util.c
+ ENTRYPOINT=boot
+ 
+-CFLAGS:=-c -Os -Wall -ffreestanding -I../../../Common/include -I../../../../Common/include -I../../../../Common/arch/arm926ejs/include -I../../../../Common/$(PROGRAM)/include -I../../../../Common/drivers/include -I../../../../Common/gnu/include 
++CFLAGS:=-DPLL_SETTING_$(PLL_SETTING) -c -Os -Wall -ffreestanding -I../../../Common/include -I../../../../Common/include -I../../../../Common/arch/arm926ejs/include -I../../../../Common/$(PROGRAM)/include -I../../../../Common/drivers/include -I../../../../Common/gnu/include 
+ ifeq ($(TYPE),nand)
+ 	CFLAGS+= -DUBL_NAND
+   SOURCES+= nand.c nandboot.c device_nand.c
+Index: ti-flash-utils/src/DM36x/Common/src/device.c
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/Common/src/device.c	2013-05-14 14:27:32.036931040 -0600
++++ ti-flash-utils/src/DM36x/Common/src/device.c	2013-05-14 14:33:38.497996081 -0600
+@@ -18,7 +18,6 @@
+ // Utility functions
+ #include "util.h"
+ 
+-//#define ARM270_DDR216_OSC24
+ /************************************************************
+ * Explicit External Declarations                            *
+ ************************************************************/
+@@ -62,11 +61,8 @@
+ 
+ static const Uint16 DDR_CAS_LATENCY = 5;
+ static const Uint16 DDR_T_RFC = 1275;
+-static const Uint16 DDR_T_RP = 200;
+-static const Uint16 DDR_T_RCD = 200;
+ static const Uint16 DDR_T_WR = 150 ;
+ static const Uint16 DDR_T_RAS = 450;
+-static const Uint16 DDR_T_RC = 650;
+ static const Uint16 DDR_T_RRD = 100;
+ static const Uint16 DDR_T_WTR = 100;
+ static const Uint32 DDR_T_RASMAX = 700000;
+@@ -79,7 +75,11 @@
+ 
+ 
+ /* PLL Divider settings for Various ARM/DDR Frequencies */
+-#if defined(ARM297_DDR270_OSC24)
++#if defined(PLL_SETTING_ARM297_DDR270_OSC24)
++
++static const Uint16 DDR_T_RP = 200;
++static const Uint16 DDR_T_RCD = 200;
++static const Uint16 DDR_T_RC = 650;
+ 
+ #define PLL1_MUL		0x2d  
+ #define PLL1_PREDIV		0x3
+@@ -110,7 +110,11 @@
+ 
+ #define DDR_FREQ	 270
+ 
+-#elif defined(ARM270_DDR216_OSC24)
++#elif defined(PLL_SETTING_ARM270_DDR216_OSC24)
++
++static const Uint16 DDR_T_RP = 200;
++static const Uint16 DDR_T_RCD = 200;
++static const Uint16 DDR_T_RC = 650;
+ 
+ #define PLL1_MUL		0x9  
+ #define PLL1_PREDIV		0x0
+@@ -141,7 +145,11 @@
+ 
+ #define DDR_FREQ	 216
+ 
+-#elif defined(ARM297_DDR277_OSC27) 
++#elif defined(PLL_SETTING_ARM297_DDR277_OSC27) 
++
++static const Uint16 DDR_T_RP = 200;
++static const Uint16 DDR_T_RCD = 200;
++static const Uint16 DDR_T_RC = 650;
+ 
+ #define PLL1_MUL		0x2c
+ #define PLL1_PREDIV		0x03
+@@ -171,7 +179,11 @@
+ 
+ #define DDR_FREQ		 277
+ 
+-#elif defined(ARM216_DDR173_OSC19P2)
++#elif defined(PLL_SETTING_ARM216_DDR173_OSC19P2)
++
++static const Uint16 DDR_T_RP = 200;
++static const Uint16 DDR_T_RCD = 200;
++static const Uint16 DDR_T_RC = 650;
+ 
+ #define PLL1_MUL		0x2d 
+ #define PLL1_PREDIV		0x3
+@@ -202,7 +214,11 @@
+ 
+ #define DDR_FREQ		 173
+ 
+-#elif defined(ARM216_DDR173_OSC24)
++#elif defined(PLL_SETTING_ARM216_DDR173_OSC24)
++
++static const Uint16 DDR_T_RP = 200;
++static const Uint16 DDR_T_RCD = 200;
++static const Uint16 DDR_T_RC = 650;
+ 
+ #define PLL1_MUL		0x73 	// VCO will 2M/N+1 = 345 Mhz
+ #define PLL1_PREDIV		0xf
+@@ -233,7 +249,11 @@
+ 
+ #define DDR_FREQ		 173
+ 
+-#elif defined(ARM432_DDR340_OSC24)
++#elif defined(PLL_SETTING_ARM432_DDR340_OSC24)
++
++static const Uint16 DDR_T_RP = 150;
++static const Uint16 DDR_T_RCD = 150;
++static const Uint16 DDR_T_RC = 55;
+ 
+ #define PLL1_MUL		0x55 
+ #define PLL1_PREDIV		0x5
+@@ -263,7 +283,11 @@
+ 
+ #define DDR_FREQ		 340
+ 
+-#else  //Arm 297 DDR 243 MHZ 
++#elif defined(PLL_SETTING_ARM297_DDR243_OSC24)
++
++static const Uint16 DDR_T_RP = 200;
++static const Uint16 DDR_T_RCD = 200;
++static const Uint16 DDR_T_RC = 650;
+ 
+ #define PLL1_MUL		0x51
+ #define PLL1_PREDIV		0x7
+@@ -294,6 +318,8 @@
+ 
+ #define DDR_FREQ		 243
+ 
++#else
++#error ERROR: unknown PLL configuration
+ #endif
+ 
+ 
+@@ -555,7 +581,7 @@
+  	PLL1->PLLCTL &= 0xFFFFFFF7;
+    
+ 	//Program the Multiper and Pre-Divider for PLL1
+-	 PLL1->PLLM   =   PLL1_MUL;   // VCO will 24*2M/N+1 = 486Mhz
++	 PLL1->PLLM   =   PLL1_MUL;   // VCO will OSC*2M/N+1
+ 	 PLL1->PREDIV =   0x8000 | PLL1_PREDIV; 
+ 	 
+ 		 
+@@ -576,13 +602,13 @@
+ 
+ 		PLL1->PLLDIV1 = 0x8000 | PLL1_DIV1;
+ 	    PLL1->PLLDIV2 = 0x8000 | PLL1_DIV2;   
+-	    PLL1->PLLDIV3 = 0x8000 | PLL1_DIV3;   // POST DIV 486/2  -> MJCP/HDVICP
+-	    PLL1->PLLDIV4 = 0x8000 | PLL1_DIV4;   // POST DIV 486/4  -> EDMA/EDMA CFG
+-	    PLL1->PLLDIV5 = 0x8000 | PLL1_DIV5;   // POST DIV 486/2 -> VPSS
+-	    PLL1->PLLDIV6 = 0x8000 | PLL1_DIV6;   // 27Mhz POST DIV 486/18  -> VENC
+-        PLL1->PLLDIV7 = 0x8000 | PLL1_DIV7;   // POST DIV 486/2 -> DDR
+-	    PLL1->PLLDIV8 = 0x8000 | PLL1_DIV8;   // POST DIV 486/4 -> MMC0/SD0
+-	    PLL1->PLLDIV9 = 0x8000 | PLL1_DIV9;   // POST DIV 486/2 -> CLKOUT
++	    PLL1->PLLDIV3 = 0x8000 | PLL1_DIV3;   // MJCP/HDVICP
++	    PLL1->PLLDIV4 = 0x8000 | PLL1_DIV4;   // EDMA/EDMA CFG
++	    PLL1->PLLDIV5 = 0x8000 | PLL1_DIV5;   // VPSS
++	    PLL1->PLLDIV6 = 0x8000 | PLL1_DIV6;   // VENC
++	    PLL1->PLLDIV7 = 0x8000 | PLL1_DIV7;   // DDR
++	    PLL1->PLLDIV8 = 0x8000 | PLL1_DIV8;   // MMC0/SD0
++	    PLL1->PLLDIV9 = 0x8000 | PLL1_DIV9;   // CLKOUT
+ 	    
+ 	 	UTIL_waitLoop(300);
+ 	    
+@@ -647,9 +673,9 @@
+ 	  // Post divider setting for PLL2 
+ 
+ 	 PLL2->PLLDIV1 = 0x8000 | PLL2_DIV1;
+-     PLL2->PLLDIV2 = 0x8000 | PLL2_DIV2;   // 594/2 =297 Mhz -> ARM 
+-	 PLL2->PLLDIV3 = 0x8000 | PLL2_DIV3;   // POST DIV 594/29 = 20.48 -> VOICE
+-	 PLL2->PLLDIV4 = 0x8000 | PLL2_DIV4;   // POST DIV 594/8 = 74.25 ->VIDEO HD
++	 PLL2->PLLDIV2 = 0x8000 | PLL2_DIV2;   // ARM 
++	 PLL2->PLLDIV3 = 0x8000 | PLL2_DIV3;   // VOICE
++	 PLL2->PLLDIV4 = 0x8000 | PLL2_DIV4;   // VIDEO
+ 	 PLL2->PLLDIV5 = 0x8000 | PLL2_DIV5;
+ 		     
+ 	  //GoCmd for PostDivider to take effect
+@@ -759,9 +785,15 @@
+ 
+ 	DDR->PBBPR = 0x000000FE;
+ 	
++#ifdef MDDR
++	DDR->SDBCR = 0x2834023 | (DDR_CAS_LATENCY << 9);	 //Enable mDDR, DDR and SDRAM. Write '1' to BOOTUNLOCK
++
++	DDR->SDBCR = 0x2034023 |  (DDR_CAS_LATENCY << 9);	//Enable mDDR, DDR and SDRAM. Write '0' to BOOTUNLOCK
++#else
+ 	DDR->SDBCR = 0xD34032 | (DDR_CAS_LATENCY << 9);	 //Enable DDR2 and DDR and SDram. Write '1' to BOOTUNLOCK
+ 
+ 	DDR->SDBCR = 0x534032 |  (DDR_CAS_LATENCY << 9);	//Enable DDR2 and DDR and SDram. Write '0' to BOOTUNLOCK
++#endif
+ 
+ 	DDR->SDRCR = (DDR_RR * DDR_FREQ) / 10; //Program SDRAM Refresh Control Registers
+ 
+@@ -913,7 +945,3 @@
+ /***********************************************************
+ * End file                                                 *
+ ***********************************************************/
+-
+-
+-
+-

@@ -1,0 +1,15 @@
+#
+# Ridgerun BSP Configuration file for DM365 EVM
+#
+
+# Now we are free to configure board specific issues
+config BSP_DM365_TIEVM
+       bool
+       default y
+
+
+config BSP_NET_HAS_ETH0
+	bool
+	depends on TI_DAVINCI_EMAC
+	select BSP_NET_HAS_NET
+	default y

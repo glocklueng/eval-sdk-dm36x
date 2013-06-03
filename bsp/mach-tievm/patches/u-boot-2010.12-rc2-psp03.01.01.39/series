@@ -1,0 +1,6 @@
+fix-dm365evm-configuration.patch
+uboot_env_in_sdcard.patch
+dm365-evm-spi-support.patch
+dm365-evm-gpio.patch
+dm365-evm-pin-mux.patch
+u-boot_maxargs_num.patch

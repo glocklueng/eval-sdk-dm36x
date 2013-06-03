@@ -1,0 +1,13 @@
+Index: gst-ffmpeg-0.10.11-new/src/gst-libs/ext/ffmpeg/configure
+===================================================================
+--- gst-ffmpeg-0.10.11-new.orig/src/gst-libs/ext/ffmpeg/configure	2011-04-20 08:32:39.709486008 -0600
++++ gst-ffmpeg-0.10.11-new/src/gst-libs/ext/ffmpeg/configure	2011-04-20 08:33:04.040986419 -0600
+@@ -2253,7 +2253,7 @@
+         objformat="coff"
+         enable dos_paths
+         ;;
+-    linux)
++    linux*)
+         enable dv1394
+         ;;
+     irix*)

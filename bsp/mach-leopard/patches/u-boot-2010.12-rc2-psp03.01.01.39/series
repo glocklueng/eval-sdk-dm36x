@@ -1,0 +1,5 @@
+dm368_leopard_support.patch
+dm368-leopard-spi-support.patch
+dm368-leopard-gpio.patch
+dm368-leopard-pin-mux.patch
+dm368-leopard-lcd_commands.patch

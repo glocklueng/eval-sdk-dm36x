@@ -1,0 +1,15 @@
+Index: ti-flash-utils/src/Common/ubl/src/ubl.c
+===================================================================
+--- ti-flash-utils.orig/src/Common/ubl/src/ubl.c	2011-03-24 15:18:19.000000000 -0600
++++ ti-flash-utils/src/Common/ubl/src/ubl.c	2013-05-14 14:27:09.934072192 -0600
+@@ -134,7 +134,9 @@
+   DEBUG_printString("TI UBL Version: ");
+   DEBUG_printString(UBL_VERSION_STRING);
+   DEBUG_printString("\r\nBooting Catalog Boot Loader\r\nBootMode = ");
+-  
++
++  DEBUG_printString("UBL " __DATE__ " " __TIME__ "\r\n");
++
+   // Select Boot Mode
+ #if defined(UBL_NAND)
+   {

@@ -1,0 +1,36 @@
+Index: gst-dmai-plugins/src/src/dm365.cfg
+===================================================================
+--- gst-dmai-plugins.orig/src/src/dm365.cfg	2011-01-28 09:13:48.357886874 -0600
++++ gst-dmai-plugins/src/src/dm365.cfg	2011-01-28 09:14:45.617935442 -0600
+@@ -29,6 +29,8 @@
+ var JPEGDEC = xdc.useModule('ti.sdo.codecs.jpegdec.ce.JPEGDEC');
+ var AACDEC = xdc.useModule('ittiam.codecs.aac_dec.ce.AAC_DEC');
+ var AACLCENC = xdc.useModule('ittiam.codecs.aaclc_enc.ce.AACLC_ENC');
++var MP3DEC = xdc.useModule('ittiam.codecs.mp3_dec.ce.MP3_DEC');
++var MP3ENC = xdc.useModule('ittiam.codecs.mp3_enc.ce.MP3_ENC');
+ 
+ var Engine = xdc.useModule('ti.sdo.ce.Engine');
+ var encodeEngine = Engine.create("codecServer", [
+@@ -37,11 +39,13 @@
+     {name: "h264dec", mod: H264DEC, local: true},
+     {name: "jpegdec", mod: JPEGDEC, local: true, groupId: 1},
+     {name: "aaclcdec", mod: AACDEC, local: true, groupId: 1},
++    {name: "mp3dec", mod: MP3DEC, local: true, groupId: 1},
+     {name: "mpeg4enc", mod: MPEG4ENC, local: true},
+     {name: "h264enc", mod: H264ENC, local: true},
+     {name: "mpeg2enc", mod: MPEG2ENC, local: true},
+     {name: "jpegenc", mod: JPEGENC, local: true, groupId: 1},
+     {name: "aaclcenc", mod: AACLCENC, local: true, groupId: 1},
++    {name: "mp3enc", mod: MP3ENC, local: true, groupId: 1},
+ ]);
+ 
+ /* Disable caching for all codecs except AAC */
+@@ -49,6 +53,8 @@
+ algSettings.useCache = false;
+ AACDEC.useCache      = true;
+ AACLCENC.useCache    = true;
++MP3DEC.useCache      = true;
++MP3ENC.useCache      = true;
+ 
+ /* Load support for the 'Davinci Multimedia Application Interface' modules */
+ var DMAI = xdc.loadPackage('ti.sdo.dmai');

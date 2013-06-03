@@ -1,0 +1,62 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm365-evm.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm365-evm.c	2011-05-31 09:22:58.231643670 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm365-evm.c	2011-05-31 09:23:11.303436534 -0600
+@@ -140,57 +140,9 @@
+        .fid_polarity = 0,
+ };
+ 
+-/* NOTE:  this is geared for the standard config, with a socketed
+- * 2 GByte Micron NAND (MT29F16G08FAA) using 128KB sectors.  If you
+- * swap chips, maybe with a different block size, partitioning may
+- * need to be changed.
+- */
+-/*define NAND_BLOCK_SIZE		SZ_128K*/
+-
+-/* For Samsung 4K NAND (K9KAG08U0M) with 256K sectors */
+-/*#define NAND_BLOCK_SIZE		SZ_256K*/
+-
+-/* For Micron 4K NAND with 512K sectors */
+-#define NAND_BLOCK_SIZE		SZ_512K
+-
+-static struct mtd_partition davinci_nand_partitions[] = {
+-	{
+-		/* UBL (a few copies) plus U-Boot */
+-		.name		= "bootloader",
+-		.offset		= 0,
+-		.size		= 30 * NAND_BLOCK_SIZE,
+-		.mask_flags	= MTD_WRITEABLE, /* force read-only */
+-	}, {
+-		/* U-Boot environment */
+-		.name		= "params",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= 2 * NAND_BLOCK_SIZE,
+-		.mask_flags	= 0,
+-	}, {
+-		.name		= "kernel",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= SZ_4M,
+-		.mask_flags	= 0,
+-	}, {
+-		.name		= "filesystem1",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= SZ_512M,
+-		.mask_flags	= 0,
+-	}, {
+-		.name		= "filesystem2",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= MTDPART_SIZ_FULL,
+-		.mask_flags	= 0,
+-	}
+-	/* two blocks with bad block table (and mirror) at the end */
+-};
+-
+ static struct davinci_nand_pdata davinci_nand_data = {
+ 	.mask_chipsel		= BIT(14),
+-	.parts			= davinci_nand_partitions,
+-	.nr_parts		= ARRAY_SIZE(davinci_nand_partitions),
+ 	.ecc_mode		= NAND_ECC_HW,
+-	.options		= NAND_USE_FLASH_BBT,
+ 	.ecc_bits		= 4,
+ };
+ 

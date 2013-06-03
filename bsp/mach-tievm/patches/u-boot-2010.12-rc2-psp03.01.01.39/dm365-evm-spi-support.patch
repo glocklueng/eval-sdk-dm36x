@@ -1,0 +1,50 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm365evm.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/include/configs/davinci_dm365evm.h	2011-03-24 18:27:09.000000000 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm365evm.h	2011-05-17 17:06:04.364920595 -0600
+@@ -74,6 +74,24 @@
+ #define CONFIG_SYS_I2C_SPEED		400000
+ #define CONFIG_SYS_I2C_SLAVE		0x10	/* SMBus host address */
+ 
++/* SPI */
++#define CONFIG_CMD_SPI
++#define CONFIG_DAVINCI_SPI
++#define SPI4_DUPLEX
++
++#define CONFIG_SYS_SPI_BASE		0x01c66800
++
++#define CONFIG_SYS_SPI0_BASE		0x01c66000
++#define CONFIG_SYS_SPI1_BASE		0x01c66800
++#define CONFIG_SYS_SPI2_BASE		0x01c67800
++#define CONFIG_SYS_SPI3_BASE		0x01c68000
++#define CONFIG_SYS_SPI4_BASE		0x01c23000
++
++//  SPI_0-3_CLK = PLLC1_SYSCLK4 = (default) 121MHz
++//  SPI_4_CLK = MXI1/MXO1 = (default) 24MHz
++#define CONFIG_SYS_SPI_CLK			121000000
++//#define CONFIG_SYS_SPI_CLK			24000000
++
+ /* NAND: socketed, two chipselects, normally 2 GBytes */
+ #define CONFIG_NAND_DAVINCI
+ #define CONFIG_SYS_NAND_CS		2
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/board/davinci/dm365evm/dm365evm.c
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/board/davinci/dm365evm/dm365evm.c	2011-03-24 18:27:07.000000000 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/board/davinci/dm365evm/dm365evm.c	2011-05-17 17:06:04.364920595 -0600
+@@ -70,6 +70,16 @@
+ 	/* Configure I2C pins so that EEPROM can be read */
+ 	writel((readl(PINMUX3) | 0x01400000), PINMUX3);
+ 
++	/* Enable SPI0 ports */
++/*	writel(((readl(PINMUX3) & 0x81FFFFFF) | 0x36000000), PINMUX3);	*/
++/*	REG(PINMUX3) |= 0x36000000;	*/
++
++	/* Enable SPI1 ports */
++	writel(((readl(PINMUX3) & 0x7FFFFFFF) | 0x80000000), PINMUX3);
++	writel(((readl(PINMUX4) & 0xFFFFFFC0) | 0x00000015), PINMUX4);
++//	REG(PINMUX3) |= 0x80000000;
++//	REG(PINMUX4) |= 0x00000015;
++
+ 	/* Read Ethernet MAC address from EEPROM */
+ 	if (dvevm_read_mac_address(eeprom_enetaddr))
+ 		davinci_sync_env_enetaddr(eeprom_enetaddr);

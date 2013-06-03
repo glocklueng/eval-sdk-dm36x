@@ -1,0 +1,24 @@
+#!/bin/sh -e
+
+case "$1" in
+start)
+    echo "Starting Ipipe daemon"
+    /usr/bin/ipiped &
+    if [ -f /usr/share/ipiped/ipipe-init ] ; then
+        ipipe-client run-config-script ipipe-init
+    fi
+    ;;
+
+stop)
+    echo "Stoping Ipipe daemon"
+    killall ipiped
+    ;;
+
+*)
+    echo "Usage: /etc/init.d/ipiped {start|stop}"
+    exit 1
+    ;;
+esac
+
+exit 0
+

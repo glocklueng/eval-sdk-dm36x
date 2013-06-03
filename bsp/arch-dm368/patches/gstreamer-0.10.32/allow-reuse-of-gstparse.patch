@@ -1,0 +1,28 @@
+Index: gstreamer-0.10.29/src/gst/parse/grammar.y
+===================================================================
+--- gstreamer-0.10.29.orig/src/gst/parse/grammar.y	2011-03-24 13:31:31.301862454 -0600
++++ gstreamer-0.10.29/src/gst/parse/grammar.y	2011-03-24 13:37:04.113483730 -0600
+@@ -502,7 +502,7 @@
+     GST_CAT_DEBUG (GST_CAT_PIPELINE, "delayed linking %s:%s to %s:%s worked", 
+                	   GST_STR_NULL (GST_ELEMENT_NAME (src)), GST_STR_NULL (link->src_pad),
+                	   GST_STR_NULL (GST_ELEMENT_NAME (link->sink)), GST_STR_NULL (link->sink_pad));
+-    g_signal_handler_disconnect (src, link->signal_id);
++    //g_signal_handler_disconnect (src, link->signal_id);
+   }
+ }
+ 
+@@ -531,11 +531,11 @@
+       data->src_pad = g_strdup (src_pad);
+       data->sink = sink;
+       data->sink_pad = g_strdup (sink_pad);
+-      if (caps) {
++      /*if (caps) {
+       	data->caps = gst_caps_copy (caps);
+-      } else {
++      } else {*/
+       	data->caps = NULL;
+-      }
++      //}
+       data->signal_id = g_signal_connect_data (src, "pad-added",
+           G_CALLBACK (gst_parse_found_pad), data,
+           (GClosureNotify) gst_parse_free_delayed_link, (GConnectFlags) 0);

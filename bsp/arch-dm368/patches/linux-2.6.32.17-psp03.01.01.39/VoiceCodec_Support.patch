@@ -1,0 +1,1326 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/mfd/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/mfd/Kconfig	2011-05-18 13:02:58.796909014 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/mfd/Kconfig	2011-05-18 13:03:00.772993540 -0600
+@@ -35,6 +35,10 @@
+ 	  This driver supports the ASIC3 multifunction chip found on many
+ 	  PDAs (mainly iPAQ and HTC based ones)
+ 
++config MFD_DAVINCI_VOICECODEC
++	tristate
++	select MFD_CORE
++
+ config MFD_DM355EVM_MSP
+ 	bool "DaVinci DM355 EVM microcontroller"
+ 	depends on I2C && MACH_DAVINCI_DM355_EVM
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/mfd/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/mfd/Makefile	2011-05-18 13:02:58.805430177 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/mfd/Makefile	2011-05-18 13:03:00.772993540 -0600
+@@ -8,6 +8,7 @@
+ obj-$(CONFIG_HTC_EGPIO)		+= htc-egpio.o
+ obj-$(CONFIG_HTC_PASIC3)	+= htc-pasic3.o
+ 
++obj-$(CONFIG_MFD_DAVINCI_VOICECODEC)	+= davinci_voicecodec.o
+ obj-$(CONFIG_MFD_DM355EVM_MSP)	+= dm355evm_msp.o
+ 
+ obj-$(CONFIG_MFD_T7L66XB)	+= t7l66xb.o
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/mfd/davinci_voicecodec.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/mfd/davinci_voicecodec.c	2011-05-18 13:03:00.772993540 -0600
+@@ -0,0 +1,189 @@
++/*
++ * DaVinci Voice Codec Core Interface for TI platforms
++ *
++ * Copyright (C) 2010 Texas Instruments, Inc
++ *
++ * Author: Miguel Aguilar <miguel.aguilar@ridgerun.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++
++#include <sound/pcm.h>
++
++#include <linux/mfd/davinci_voicecodec.h>
++
++u32 davinci_vc_read(struct davinci_vc *davinci_vc, int reg)
++{
++	return __raw_readl(davinci_vc->base + reg);
++}
++
++void davinci_vc_write(struct davinci_vc *davinci_vc,
++					   int reg, u32 val)
++{
++	__raw_writel(val, davinci_vc->base + reg);
++}
++
++static int __init davinci_vc_probe(struct platform_device *pdev)
++{
++	struct davinci_vc *davinci_vc;
++	struct resource *res, *mem;
++	struct mfd_cell *cell = NULL;
++	int ret;
++
++	davinci_vc = kzalloc(sizeof(struct davinci_vc), GFP_KERNEL);
++	if (!davinci_vc) {
++		dev_dbg(&pdev->dev,
++			    "could not allocate memory for private data\n");
++		return -ENOMEM;
++	}
++
++	davinci_vc->clk = clk_get(&pdev->dev, NULL);
++	if (IS_ERR(davinci_vc->clk)) {
++		dev_dbg(&pdev->dev,
++			    "could not get the clock for voice codec\n");
++		ret = -ENODEV;
++		goto fail1;
++	}
++	clk_enable(davinci_vc->clk);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "no mem resource\n");
++		ret = -ENODEV;
++		goto fail2;
++	}
++
++	davinci_vc->pbase = res->start;
++	davinci_vc->base_size = resource_size(res);
++
++	mem = request_mem_region(davinci_vc->pbase, davinci_vc->base_size,
++				 pdev->name);
++	if (!mem) {
++		dev_err(&pdev->dev, "VCIF region already claimed\n");
++		ret = -EBUSY;
++		goto fail2;
++	}
++
++	davinci_vc->base = ioremap(davinci_vc->pbase, davinci_vc->base_size);
++	if (!davinci_vc->base) {
++		dev_err(&pdev->dev, "can't ioremap mem resource.\n");
++		ret = -ENOMEM;
++		goto fail3;
++	}
++
++	res = platform_get_resource(pdev, IORESOURCE_DMA, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "no DMA resource\n");
++		return -ENXIO;
++	}
++
++	davinci_vc->davinci_vcif.dma_tx_channel = res->start;
++	davinci_vc->davinci_vcif.dma_tx_addr =
++		(dma_addr_t)(io_v2p(davinci_vc->base) + DAVINCI_VC_WFIFO);
++
++	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
++	if (!res) {
++		dev_err(&pdev->dev, "no DMA resource\n");
++		return -ENXIO;
++	}
++
++	davinci_vc->davinci_vcif.dma_rx_channel = res->start;
++	davinci_vc->davinci_vcif.dma_rx_addr =
++		(dma_addr_t)(io_v2p(davinci_vc->base) + DAVINCI_VC_RFIFO);
++
++	davinci_vc->dev = &pdev->dev;
++	davinci_vc->pdev = pdev;
++
++	/* Voice codec interface client */
++	cell = &davinci_vc->cells[DAVINCI_VC_VCIF_CELL];
++	cell->name = "davinci_vcif";
++	cell->driver_data = davinci_vc;
++
++	/* Voice codec CQ93VC client */
++	cell = &davinci_vc->cells[DAVINCI_VC_CQ93VC_CELL];
++	cell->name = "cq93vc";
++	cell->driver_data = davinci_vc;
++
++	ret = mfd_add_devices(&pdev->dev, pdev->id, davinci_vc->cells,
++			      DAVINCI_VC_CELLS, NULL, 0);
++	if (ret != 0) {
++		dev_err(&pdev->dev, "fail to register client devices\n");
++		goto fail4;
++	}
++
++	return 0;
++
++fail4:
++	iounmap(davinci_vc->base);
++fail3:
++	release_mem_region(davinci_vc->pbase, davinci_vc->base_size);
++fail2:
++	clk_disable(davinci_vc->clk);
++	clk_put(davinci_vc->clk);
++	davinci_vc->clk = NULL;
++fail1:
++	kfree(davinci_vc);
++
++	return ret;
++}
++
++static int __devexit davinci_vc_remove(struct platform_device *pdev)
++{
++	struct davinci_vc *davinci_vc = platform_get_drvdata(pdev);
++
++	mfd_remove_devices(&pdev->dev);
++
++	iounmap(davinci_vc->base);
++	release_mem_region(davinci_vc->pbase, davinci_vc->base_size);
++
++	clk_disable(davinci_vc->clk);
++	clk_put(davinci_vc->clk);
++	davinci_vc->clk = NULL;
++
++	kfree(davinci_vc);
++
++	return 0;
++}
++
++static struct platform_driver davinci_vc_driver = {
++	.driver	= {
++		.name = "davinci_voicecodec",
++		.owner = THIS_MODULE,
++	},
++	.remove	= __devexit_p(davinci_vc_remove),
++};
++
++static int __init davinci_vc_init(void)
++{
++	return platform_driver_probe(&davinci_vc_driver, davinci_vc_probe);
++}
++module_init(davinci_vc_init);
++
++static void __exit davinci_vc_exit(void)
++{
++	platform_driver_unregister(&davinci_vc_driver);
++}
++module_exit(davinci_vc_exit);
++
++MODULE_AUTHOR("Miguel Aguilar");
++MODULE_DESCRIPTION("Texas Instruments DaVinci Voice Codec Core Interface");
++MODULE_LICENSE("GPL");
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/linux/mfd/davinci_voicecodec.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/linux/mfd/davinci_voicecodec.h	2011-05-18 13:03:00.772993540 -0600
+@@ -0,0 +1,126 @@
++/*
++ * DaVinci Voice Codec Core Interface for TI platforms
++ *
++ * Copyright (C) 2010 Texas Instruments, Inc
++ *
++ * Author: Miguel Aguilar <miguel.aguilar@ridgerun.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#ifndef __LINUX_MFD_DAVINCI_VOICECODEC_H_
++#define __LINUX_MFD_DAVINIC_VOICECODEC_H_
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++#include <linux/mfd/core.h>
++
++#include <mach/edma.h>
++
++/*
++ * Register values.
++ */
++#define DAVINCI_VC_PID			0x00
++#define DAVINCI_VC_CTRL			0x04
++#define DAVINCI_VC_INTEN		0x08
++#define DAVINCI_VC_INTSTATUS		0x0c
++#define DAVINCI_VC_INTCLR		0x10
++#define DAVINCI_VC_EMUL_CTRL		0x14
++#define DAVINCI_VC_RFIFO		0x20
++#define DAVINCI_VC_WFIFO		0x24
++#define DAVINCI_VC_FIFOSTAT		0x28
++#define DAVINCI_VC_TST_CTRL		0x2C
++#define DAVINCI_VC_REG05		0x94
++#define DAVINCI_VC_REG09		0xA4
++#define DAVINCI_VC_REG12		0xB0
++
++/* DAVINCI_VC_CTRL bit fields */
++#define DAVINCI_VC_CTRL_MASK		0x5500
++#define DAVINCI_VC_CTRL_RSTADC		BIT(0)
++#define DAVINCI_VC_CTRL_RSTDAC		BIT(1)
++#define DAVINCI_VC_CTRL_RD_BITS_8	BIT(4)
++#define DAVINCI_VC_CTRL_RD_UNSIGNED	BIT(5)
++#define DAVINCI_VC_CTRL_WD_BITS_8	BIT(6)
++#define DAVINCI_VC_CTRL_WD_UNSIGNED	BIT(7)
++#define DAVINCI_VC_CTRL_RFIFOEN		BIT(8)
++#define DAVINCI_VC_CTRL_RFIFOCL		BIT(9)
++#define DAVINCI_VC_CTRL_RFIFOMD_WORD_1	BIT(10)
++#define DAVINCI_VC_CTRL_WFIFOEN		BIT(12)
++#define DAVINCI_VC_CTRL_WFIFOCL		BIT(13)
++#define DAVINCI_VC_CTRL_WFIFOMD_WORD_1	BIT(14)
++
++/* DAVINCI_VC_INT bit fields */
++#define DAVINCI_VC_INT_MASK		0x3F
++#define DAVINCI_VC_INT_RDRDY_MASK	BIT(0)
++#define DAVINCI_VC_INT_RERROVF_MASK	BIT(1)
++#define DAVINCI_VC_INT_RERRUDR_MASK	BIT(2)
++#define DAVINCI_VC_INT_WDREQ_MASK	BIT(3)
++#define DAVINCI_VC_INT_WERROVF_MASKBIT	BIT(4)
++#define DAVINCI_VC_INT_WERRUDR_MASK	BIT(5)
++
++/* DAVINCI_VC_REG05 bit fields */
++#define DAVINCI_VC_REG05_PGA_GAIN	0x07
++
++/* DAVINCI_VC_REG09 bit fields */
++#define DAVINCI_VC_REG09_MUTE		0x40
++#define DAVINCI_VC_REG09_DIG_ATTEN	0x3F
++
++/* DAVINCI_VC_REG12 bit fields */
++#define DAVINCI_VC_REG12_POWER_ALL_ON	0xFD
++#define DAVINCI_VC_REG12_POWER_ALL_OFF	0x00
++
++#define DAVINCI_VC_CELLS		2
++
++enum davinci_vc_cells {
++	DAVINCI_VC_VCIF_CELL,
++	DAVINCI_VC_CQ93VC_CELL,
++};
++
++struct davinci_vcif {
++	struct platform_device	*pdev;
++	u32 dma_tx_channel;
++	u32 dma_rx_channel;
++	dma_addr_t dma_tx_addr;
++	dma_addr_t dma_rx_addr;
++};
++
++struct cq93vc {
++	struct platform_device *pdev;
++	struct snd_soc_codec *codec;
++	u32 sysclk;
++};
++
++struct davinci_vc;
++
++struct davinci_vc {
++	/* Device data */
++	struct device *dev;
++	struct platform_device *pdev;
++	struct clk *clk;
++
++	/* Memory resources */
++	void __iomem *base;
++	resource_size_t pbase;
++	size_t base_size;
++
++	/* MFD cells */
++	struct mfd_cell cells[DAVINCI_VC_CELLS];
++
++	/* Client devices */
++	struct davinci_vcif davinci_vcif;
++	struct cq93vc cq93vc;
++};
++
++#endif
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/Kconfig	2011-05-18 13:02:58.853051691 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/Kconfig	2011-05-18 13:03:00.772993540 -0600
+@@ -12,15 +12,37 @@
+ config SND_DAVINCI_SOC_MCASP
+ 	tristate
+ 
++config SND_DAVINCI_SOC_VCIF
++	tristate
++
+ config SND_DAVINCI_SOC_EVM
+ 	tristate "SoC Audio support for DaVinci DM6446, DM355 or DM365 EVM"
+ 	depends on SND_DAVINCI_SOC
+-	depends on MACH_DAVINCI_EVM || MACH_DAVINCI_DM355_EVM  || MACH_DAVINCI_DM365_EVM
++	depends on MACH_DAVINCI_EVM || MACH_DAVINCI_DM355_EVM || MACH_DAVINCI_DM365_EVM
+ 	select SND_DAVINCI_SOC_I2S
+ 	select SND_SOC_TLV320AIC3X
+ 	help
+ 	  Say Y if you want to add support for SoC audio on TI
+-	  DaVinci DM6446 or DM355 EVM platforms.
++	  DaVinci DM6446, DM355 or DM365 EVM platforms.
++
++choice
++	prompt "DM365 codec select"
++	depends on SND_DAVINCI_SOC_EVM
++	default SND_DM365_EXTERNAL_CODEC
++
++config SND_DM365_AIC3X_CODEC
++	bool "Audio Codec - AIC3101"
++	help
++	  Say Y if you want to add support for AIC3101 audio codec
++
++config SND_DM365_VOICE_CODEC
++	bool "Voice Codec - CQ93VC"
++	select MFD_DAVINCI_VOICECODEC
++	select SND_DAVINCI_SOC_VCIF
++	select SND_SOC_CQ0093VC
++	help
++	  Say Y if you want to add support for SoC On-chip voice codec
++endchoice
+ 
+ config  SND_DM6467_SOC_EVM
+ 	tristate "SoC Audio support for DaVinci DM6467 EVM"
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/Makefile	2011-05-18 13:02:58.877511415 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/Makefile	2011-05-18 13:03:00.772993540 -0600
+@@ -2,10 +2,12 @@
+ snd-soc-davinci-objs := davinci-pcm.o
+ snd-soc-davinci-i2s-objs := davinci-i2s.o
+ snd-soc-davinci-mcasp-objs:= davinci-mcasp.o
++snd-soc-davinci-vcif-objs:= davinci-vcif.o
+ 
+ obj-$(CONFIG_SND_DAVINCI_SOC) += snd-soc-davinci.o
+ obj-$(CONFIG_SND_DAVINCI_SOC_I2S) += snd-soc-davinci-i2s.o
+ obj-$(CONFIG_SND_DAVINCI_SOC_MCASP) += snd-soc-davinci-mcasp.o
++obj-$(CONFIG_SND_DAVINCI_SOC_VCIF) += snd-soc-davinci-vcif.o
+ 
+ # DAVINCI Machine Support
+ snd-soc-evm-objs := davinci-evm.o
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-vcif.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-vcif.c	2011-05-18 13:03:00.772993540 -0600
+@@ -0,0 +1,273 @@
++/*
++ * ALSA SoC Voice Codec Interface for TI DAVINCI processor
++ *
++ * Copyright (C) 2010 Texas Instruments.
++ *
++ * Author: Miguel Aguilar <miguel.aguilar@ridgerun.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/device.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/mfd/davinci_voicecodec.h>
++
++#include <sound/core.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
++#include <sound/initval.h>
++#include <sound/soc.h>
++
++#include "davinci-pcm.h"
++#include "davinci-i2s.h"
++#include "davinci-vcif.h"
++
++#define MOD_REG_BIT(val, mask, set) do { \
++	if (set) { \
++		val |= mask; \
++	} else { \
++		val &= ~mask; \
++	} \
++} while (0)
++
++struct davinci_vcif_dev {
++	struct davinci_pcm_dma_params	dma_params[2];
++	struct davinci_vc *davinci_vc;
++};
++
++static void davinci_vcif_start(struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct davinci_vcif_dev *davinci_vcif_dev =
++					rtd->dai->cpu_dai->private_data;
++	struct davinci_vc *davinci_vc = davinci_vcif_dev->davinci_vc;
++	u32 w;
++
++	/* Start the sample generator and enable transmitter/receiver */
++	w = readl(davinci_vc->base + DAVINCI_VC_CTRL);
++
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RSTDAC, 1);
++	else
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RSTADC, 1);
++
++	writel(w, davinci_vc->base + DAVINCI_VC_CTRL);
++}
++
++static void davinci_vcif_stop(struct snd_pcm_substream *substream)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct davinci_vcif_dev *davinci_vcif_dev =
++					rtd->dai->cpu_dai->private_data;
++	struct davinci_vc *davinci_vc = davinci_vcif_dev->davinci_vc;
++	u32 w;
++
++	/* Reset transmitter/receiver and sample rate/frame sync generators */
++	w = readl(davinci_vc->base + DAVINCI_VC_CTRL);
++	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RSTDAC, 0);
++	else
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RSTADC, 0);
++
++	writel(w, davinci_vc->base + DAVINCI_VC_CTRL);
++}
++
++static int davinci_vcif_hw_params(struct snd_pcm_substream *substream,
++				  struct snd_pcm_hw_params *params,
++				  struct snd_soc_dai *dai)
++{
++	struct davinci_vcif_dev *davinci_vcif_dev = dai->private_data;
++	struct davinci_vc *davinci_vc = davinci_vcif_dev->davinci_vc;
++	struct davinci_pcm_dma_params *dma_params =
++			&davinci_vcif_dev->dma_params[substream->stream];
++	u32 w;
++
++	/* Restart the codec before setup */
++	davinci_vcif_stop(substream);
++	davinci_vcif_start(substream);
++
++	/* General line settings */
++	writel(DAVINCI_VC_CTRL_MASK, davinci_vc->base + DAVINCI_VC_CTRL);
++
++	writel(DAVINCI_VC_INT_MASK, davinci_vc->base + DAVINCI_VC_INTCLR);
++
++	writel(DAVINCI_VC_INT_MASK, davinci_vc->base + DAVINCI_VC_INTEN);
++
++	w = readl(davinci_vc->base + DAVINCI_VC_CTRL);
++
++	/* Determine xfer data type */
++	switch (params_format(params)) {
++	case SNDRV_PCM_FORMAT_U8:
++		dma_params->data_type = 0;
++
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RD_BITS_8 |
++			    DAVINCI_VC_CTRL_RD_UNSIGNED |
++			    DAVINCI_VC_CTRL_WD_BITS_8 |
++			    DAVINCI_VC_CTRL_WD_UNSIGNED, 1);
++		break;
++	case SNDRV_PCM_FORMAT_S8:
++		dma_params->data_type = 1;
++
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RD_BITS_8 |
++			    DAVINCI_VC_CTRL_WD_BITS_8, 1);
++
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RD_UNSIGNED |
++			    DAVINCI_VC_CTRL_WD_UNSIGNED, 0);
++		break;
++	case SNDRV_PCM_FORMAT_S16_LE:
++		dma_params->data_type = 2;
++
++		MOD_REG_BIT(w, DAVINCI_VC_CTRL_RD_BITS_8 |
++			    DAVINCI_VC_CTRL_RD_UNSIGNED |
++			    DAVINCI_VC_CTRL_WD_BITS_8 |
++			    DAVINCI_VC_CTRL_WD_UNSIGNED, 0);
++		break;
++	default:
++		printk(KERN_WARNING "davinci-vcif: unsupported PCM format");
++		return -EINVAL;
++	}
++
++	dma_params->acnt  = dma_params->data_type;
++
++	writel(w, davinci_vc->base + DAVINCI_VC_CTRL);
++
++	return 0;
++}
++
++static int davinci_vcif_trigger(struct snd_pcm_substream *substream, int cmd,
++				struct snd_soc_dai *dai)
++{
++	int ret = 0;
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		davinci_vcif_start(substream);
++		break;
++	case SNDRV_PCM_TRIGGER_STOP:
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		davinci_vcif_stop(substream);
++		break;
++	default:
++		ret = -EINVAL;
++	}
++
++	return ret;
++}
++
++#define DAVINCI_VCIF_RATES	SNDRV_PCM_RATE_8000_48000
++
++static struct snd_soc_dai_ops davinci_vcif_dai_ops = {
++	.trigger	= davinci_vcif_trigger,
++	.hw_params	= davinci_vcif_hw_params,
++};
++
++struct snd_soc_dai davinci_vcif_dai = {
++	.name = "davinci-vcif",
++	.playback = {
++		.channels_min = 1,
++		.channels_max = 2,
++		.rates = DAVINCI_VCIF_RATES,
++		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
++	.capture = {
++		.channels_min = 1,
++		.channels_max = 2,
++		.rates = DAVINCI_VCIF_RATES,
++		.formats = SNDRV_PCM_FMTBIT_S16_LE,},
++	.ops = &davinci_vcif_dai_ops,
++
++};
++EXPORT_SYMBOL_GPL(davinci_vcif_dai);
++
++static int davinci_vcif_probe(struct platform_device *pdev)
++{
++	struct davinci_vc *davinci_vc = platform_get_drvdata(pdev);
++	struct davinci_vcif_dev *davinci_vcif_dev;
++	int ret;
++
++	davinci_vcif_dev = kzalloc(sizeof(struct davinci_vcif_dev), GFP_KERNEL);
++	if (!davinci_vc) {
++		dev_dbg(&pdev->dev,
++			"could not allocate memory for private data\n");
++		return -ENOMEM;
++	}
++
++	/* DMA tx params */
++	davinci_vcif_dev->davinci_vc = davinci_vc;
++	davinci_vcif_dev->dma_params[SNDRV_PCM_STREAM_PLAYBACK].channel =
++					davinci_vc->davinci_vcif.dma_tx_channel;
++	davinci_vcif_dev->dma_params[SNDRV_PCM_STREAM_PLAYBACK].dma_addr =
++					davinci_vc->davinci_vcif.dma_tx_addr;
++
++	/* DMA rx params */
++	davinci_vcif_dev->dma_params[SNDRV_PCM_STREAM_CAPTURE].channel =
++					davinci_vc->davinci_vcif.dma_rx_channel;
++	davinci_vcif_dev->dma_params[SNDRV_PCM_STREAM_CAPTURE].dma_addr =
++					davinci_vc->davinci_vcif.dma_rx_addr;
++
++	davinci_vcif_dai.dev = &pdev->dev;
++	davinci_vcif_dai.dma_data = davinci_vcif_dev->dma_params;
++	davinci_vcif_dai.private_data = davinci_vcif_dev;
++
++	ret = snd_soc_register_dai(&davinci_vcif_dai);
++	if (ret != 0) {
++		dev_err(&pdev->dev, "could not register dai\n");
++		goto fail;
++	}
++
++	return 0;
++
++fail:
++	kfree(davinci_vcif_dev);
++
++	return ret;
++}
++
++static int davinci_vcif_remove(struct platform_device *pdev)
++{
++	snd_soc_unregister_dai(&davinci_vcif_dai);
++
++	return 0;
++}
++
++static struct platform_driver davinci_vcif_driver = {
++	.probe		= davinci_vcif_probe,
++	.remove		= davinci_vcif_remove,
++	.driver		= {
++		.name	= "davinci_vcif",
++		.owner	= THIS_MODULE,
++	},
++};
++
++static int __init davinci_vcif_init(void)
++{
++	return platform_driver_probe(&davinci_vcif_driver, davinci_vcif_probe);
++}
++module_init(davinci_vcif_init);
++
++static void __exit davinci_vcif_exit(void)
++{
++	platform_driver_unregister(&davinci_vcif_driver);
++}
++module_exit(davinci_vcif_exit);
++
++MODULE_AUTHOR("Miguel Aguilar");
++MODULE_DESCRIPTION("Texas Instruments DaVinci ASoC Voice Codec Interface");
++MODULE_LICENSE("GPL");
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-vcif.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-vcif.h	2011-05-18 13:03:00.772993540 -0600
+@@ -0,0 +1,28 @@
++/*
++ * ALSA SoC Voice Codec Interface for TI DAVINCI processor
++ *
++ * Copyright (C) 2010 Texas Instruments.
++ *
++ * Author: Miguel Aguilar <miguel.aguilar@ridgerun.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#ifndef _DAVINCI_VCIF_H
++#define _DAVINCI_VCIF_H
++
++extern struct snd_soc_dai davinci_vcif_dai;
++
++#endif
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/Kconfig	2011-05-18 13:02:58.821551438 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/Kconfig	2011-05-18 13:03:00.772993540 -0600
+@@ -19,6 +19,7 @@
+ 	select SND_SOC_AK4104 if SPI_MASTER
+ 	select SND_SOC_AK4535 if I2C
+ 	select SND_SOC_AK4642 if I2C
++	select SND_SOC_CQ0093VC if MFD_DAVINCI_VOICECODEC
+ 	select SND_SOC_CS4270 if I2C
+ 	select SND_SOC_MAX9877 if I2C
+ 	select SND_SOC_PCM3008
+@@ -96,6 +97,9 @@
+ config SND_SOC_AK4642
+ 	tristate
+ 
++config SND_SOC_CQ0093VC
++	tristate
++
+ # Cirrus Logic CS4270 Codec
+ config SND_SOC_CS4270
+ 	tristate
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/Makefile	2011-05-18 13:02:58.837551177 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/Makefile	2011-05-18 13:03:00.772993540 -0600
+@@ -6,6 +6,7 @@
+ snd-soc-ak4104-objs := ak4104.o
+ snd-soc-ak4535-objs := ak4535.o
+ snd-soc-ak4642-objs := ak4642.o
++snd-soc-cq93vc-objs := cq93vc.o
+ snd-soc-cs4270-objs := cs4270.o
+ snd-soc-cx20442-objs := cx20442.o
+ snd-soc-l3-objs := l3.o
+@@ -56,6 +57,7 @@
+ obj-$(CONFIG_SND_SOC_AK4104)	+= snd-soc-ak4104.o
+ obj-$(CONFIG_SND_SOC_AK4535)	+= snd-soc-ak4535.o
+ obj-$(CONFIG_SND_SOC_AK4642)	+= snd-soc-ak4642.o
++obj-$(CONFIG_SND_SOC_CQ0093VC) += snd-soc-cq93vc.o
+ obj-$(CONFIG_SND_SOC_CS4270)	+= snd-soc-cs4270.o
+ obj-$(CONFIG_SND_SOC_CX20442)	+= snd-soc-cx20442.o
+ obj-$(CONFIG_SND_SOC_L3)	+= snd-soc-l3.o
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/cq93vc.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/cq93vc.c	2011-05-18 13:03:35.658711551 -0600
+@@ -0,0 +1,318 @@
++/*
++ * ALSA SoC CQ0093 Voice Codec Driver for DaVinci platforms
++ *
++ * Copyright (C) 2010 Texas Instruments, Inc
++ *
++ * Author: Miguel Aguilar <miguel.aguilar@ridgerun.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++#include <linux/module.h>
++#include <linux/moduleparam.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/delay.h>
++#include <linux/pm.h>
++#include <linux/platform_device.h>
++#include <linux/device.h>
++#include <linux/clk.h>
++#include <linux/mfd/davinci_voicecodec.h>
++
++#include <sound/core.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
++#include <sound/soc.h>
++#include <sound/soc-dai.h>
++#include <sound/soc-dapm.h>
++#include <sound/initval.h>
++
++#include <mach/dm365.h>
++
++#include "cq93vc.h"
++
++static inline unsigned int cq93vc_read(struct snd_soc_codec *codec,
++						unsigned int reg)
++{
++	struct davinci_vc *davinci_vc = codec->control_data;
++
++	return readl(davinci_vc->base + reg);
++}
++
++static inline int cq93vc_write(struct snd_soc_codec *codec, unsigned int reg,
++		       unsigned int value)
++{
++	struct davinci_vc *davinci_vc = codec->control_data;
++
++	writel(value, davinci_vc->base + reg);
++
++	return 0;
++}
++
++static const struct snd_kcontrol_new cq93vc_snd_controls[] = {
++	SOC_SINGLE("PGA Capture Volume", DAVINCI_VC_REG05, 0, 0x03, 0),
++	SOC_SINGLE("Mono DAC Playback Volume", DAVINCI_VC_REG09, 0, 0x3f, 0),
++};
++
++static int cq93vc_mute(struct snd_soc_dai *dai, int mute)
++{
++	struct snd_soc_codec *codec = dai->codec;
++	u8 reg = cq93vc_read(codec, DAVINCI_VC_REG09) & ~DAVINCI_VC_REG09_MUTE;
++
++	if (mute)
++		cq93vc_write(codec, DAVINCI_VC_REG09,
++			     reg | DAVINCI_VC_REG09_MUTE);
++	else
++		cq93vc_write(codec, DAVINCI_VC_REG09, reg);
++
++	return 0;
++}
++
++static int cq93vc_set_dai_sysclk(struct snd_soc_dai *codec_dai,
++				 int clk_id, unsigned int freq, int dir)
++{
++	struct snd_soc_codec *codec = codec_dai->codec;
++	struct davinci_vc *davinci_vc = codec->control_data;
++
++	switch (freq) {
++	case 22579200:
++	case 27000000:
++	case 33868800:
++		davinci_vc->cq93vc.sysclk = freq;
++		return 0;
++	}
++
++	return -EINVAL;
++}
++
++static int cq93vc_set_bias_level(struct snd_soc_codec *codec,
++				enum snd_soc_bias_level level)
++{
++	switch (level) {
++	case SND_SOC_BIAS_ON:
++		cq93vc_write(codec, DAVINCI_VC_REG12,
++			     DAVINCI_VC_REG12_POWER_ALL_ON);
++		break;
++	case SND_SOC_BIAS_PREPARE:
++		break;
++	case SND_SOC_BIAS_STANDBY:
++		cq93vc_write(codec, DAVINCI_VC_REG12,
++			     DAVINCI_VC_REG12_POWER_ALL_OFF);
++		break;
++	case SND_SOC_BIAS_OFF:
++		/* force all power off */
++		cq93vc_write(codec, DAVINCI_VC_REG12,
++			     DAVINCI_VC_REG12_POWER_ALL_OFF);
++		break;
++	}
++	codec->bias_level = level;
++
++	return 0;
++}
++
++#define CQ93VC_RATES	(SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000)
++#define CQ93VC_FORMATS	(SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE)
++
++static struct snd_soc_dai_ops cq93vc_dai_ops = {
++	.digital_mute	= cq93vc_mute,
++	.set_sysclk	= cq93vc_set_dai_sysclk,
++};
++
++struct snd_soc_dai cq93vc_dai = {
++	.name = "CQ93VC",
++	.playback = {
++		.stream_name = "Playback",
++		.channels_min = 1,
++		.channels_max = 2,
++		.rates = CQ93VC_RATES,
++		.formats = CQ93VC_FORMATS,},
++	.capture = {
++		.stream_name = "Capture",
++		.channels_min = 1,
++		.channels_max = 2,
++		.rates = CQ93VC_RATES,
++		.formats = CQ93VC_FORMATS,},
++	.ops = &cq93vc_dai_ops,
++};
++EXPORT_SYMBOL_GPL(cq93vc_dai);
++
++static int cq93vc_resume(struct platform_device *pdev)
++{
++	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
++	struct snd_soc_codec *codec = socdev->card->codec;
++
++	cq93vc_set_bias_level(codec, codec->suspend_bias_level);
++
++	return 0;
++}
++
++static struct snd_soc_codec *cq93vc_codec;
++
++static int cq93vc_probe(struct platform_device *pdev)
++{
++    struct snd_soc_device *socdev = platform_get_drvdata(pdev);
++    struct device *dev = &pdev->dev;
++    struct snd_soc_codec *codec;
++    int ret;
++
++    socdev->card->codec = cq93vc_codec;
++    codec = socdev->card->codec;
++
++    /* Register pcms */
++    ret = snd_soc_new_pcms(socdev, SNDRV_DEFAULT_IDX1, SNDRV_DEFAULT_STR1);
++
++    if (ret < 0) {
++	printk(KERN_INFO "ERROR!! \n");
++	dev_err(dev, "%s: failed to create pcms\n", pdev->name);
++
++	// return ret;
++	goto pcm_err;
++    }
++
++    /* Set controls */
++    snd_soc_add_controls(codec, cq93vc_snd_controls,
++    ARRAY_SIZE(cq93vc_snd_controls));
++
++    /* Off, with power on */
++    cq93vc_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
++    ret = snd_soc_init_card(socdev);
++
++    if (ret < 0) {
++	printk(KERN_ERR "cq93vc: failed to register card\n");
++	goto card_err;
++    }
++
++    // return 0;
++    return ret;
++
++card_err:
++    snd_soc_free_pcms(socdev);
++    snd_soc_dapm_free(socdev);
++
++pcm_err:
++    kfree(codec->reg_cache);
++
++    return ret;
++}
++
++static int cq93vc_remove(struct platform_device *pdev)
++{
++	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
++
++	snd_soc_free_pcms(socdev);
++	snd_soc_dapm_free(socdev);
++
++	return 0;
++}
++
++struct snd_soc_codec_device soc_codec_dev_cq93vc = {
++	.probe = cq93vc_probe,
++	.remove = cq93vc_remove,
++	.resume = cq93vc_resume,
++};
++EXPORT_SYMBOL_GPL(soc_codec_dev_cq93vc);
++
++static __init int cq93vc_codec_probe(struct platform_device *pdev)
++{
++	struct davinci_vc *davinci_vc = platform_get_drvdata(pdev);
++	struct snd_soc_codec *codec;
++	int ret;
++
++	codec = kzalloc(sizeof(struct snd_soc_codec), GFP_KERNEL);
++	if (codec == NULL) {
++		dev_dbg(davinci_vc->dev,
++			"could not allocate memory for codec data\n");
++		return -ENOMEM;
++	}
++
++	davinci_vc->cq93vc.codec = codec;
++
++	cq93vc_dai.dev = &pdev->dev;
++
++	mutex_init(&codec->mutex);
++	INIT_LIST_HEAD(&codec->dapm_widgets);
++	INIT_LIST_HEAD(&codec->dapm_paths);
++	codec->dev = &pdev->dev;
++	codec->name = "CQ93VC";
++	codec->owner = THIS_MODULE;
++	codec->read = cq93vc_read;
++	codec->write = cq93vc_write;
++	codec->set_bias_level = cq93vc_set_bias_level;
++	codec->dai = &cq93vc_dai;
++	codec->num_dai = 1;
++	codec->control_data = davinci_vc;
++
++	cq93vc_codec = codec;
++
++	ret = snd_soc_register_codec(codec);
++	if (ret) {
++		dev_err(davinci_vc->dev, "failed to register codec\n");
++		goto fail1;
++	}
++
++	ret = snd_soc_register_dai(&cq93vc_dai);
++	if (ret) {
++		dev_err(davinci_vc->dev, "could register dai\n");
++		goto fail2;
++	}
++	return 0;
++
++fail2:
++	snd_soc_unregister_codec(codec);
++
++fail1:
++	kfree(codec);
++	cq93vc_codec = NULL;
++
++	return ret;
++}
++
++static int __devexit cq93vc_codec_remove(struct platform_device *pdev)
++{
++	struct snd_soc_device *socdev = platform_get_drvdata(pdev);
++	struct snd_soc_codec *codec = socdev->card->codec;
++
++	snd_soc_unregister_dai(&cq93vc_dai);
++	snd_soc_unregister_codec(&codec);
++
++	kfree(codec);
++	cq93vc_codec = NULL;
++
++	return 0;
++}
++
++static struct platform_driver cq93vc_codec_driver = {
++	.driver = {
++		   .name = "cq93vc",
++		   .owner = THIS_MODULE,
++		   },
++	.probe = cq93vc_codec_probe,
++	.remove = __devexit_p(cq93vc_codec_remove),
++};
++
++static __init int cq93vc_init(void)
++{
++	return platform_driver_probe(&cq93vc_codec_driver, cq93vc_codec_probe);
++}
++module_init(cq93vc_init);
++
++static __exit void cq93vc_exit(void)
++{
++	platform_driver_unregister(&cq93vc_codec_driver);
++}
++module_exit(cq93vc_exit);
++
++MODULE_DESCRIPTION("Texas Instruments DaVinci ASoC CQ0093 Voice Codec Driver");
++MODULE_AUTHOR("Miguel Aguilar");
++MODULE_LICENSE("GPL");
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/cq93vc.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/cq93vc.h	2011-05-18 13:03:00.772993540 -0600
+@@ -0,0 +1,29 @@
++/*
++ * ALSA SoC CQ0093 Voice Codec Driver for DaVinci platforms
++ *
++ * Copyright (C) 2010 Texas Instruments, Inc
++ *
++ * Author: Miguel Aguilar <miguel.aguilar@ridgerun.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
++
++#ifndef _CQ93VC_H
++#define _CQ93VC_H
++
++extern struct snd_soc_dai cq93vc_dai;
++extern struct snd_soc_codec_device soc_codec_dev_cq93vc;
++
++#endif
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/dm365.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/dm365.h	2011-05-18 13:02:58.789162248 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/dm365.h	2011-05-18 13:03:00.777413080 -0600
+@@ -29,11 +29,16 @@
+ 
+ #define DM365_RTC_BASE			(0x01C69000)
+ 
++#define DAVINCI_DM365_VC_BASE		(0x01D0C000)
++#define DAVINCI_DMA_VC_TX		2
++#define DAVINCI_DMA_VC_RX		3
++
+ /* Base of key scan register bank */
+ #define DM365_KEYSCAN_BASE		(0x01C69400)
+ 
+ void __init dm365_init(void);
+ void __init dm365_init_asp(struct snd_platform_data *pdata);
++void __init dm365_init_vc(struct snd_platform_data *pdata);
+ void __init dm365_init_rtc(void);
+ void __init dm365_init_ks(struct davinci_ks_platform_data *pdata);
+ void dm365_set_vpfe_config(struct vpfe_config *cfg);
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c	2011-05-18 13:02:58.773162230 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c	2011-05-18 13:03:00.777413080 -0600
+@@ -462,7 +462,7 @@
+ 	CLK(NULL, "timer3", &timer3_clk),
+ 	CLK(NULL, "usb", &usb_clk),
+ 	CLK("davinci_emac.1", NULL, &emac_clk),
+-	CLK("voice_codec", NULL, &voicecodec_clk),
++	CLK("davinci_voicecodec", NULL, &voicecodec_clk),
+ 	CLK("davinci-asp.0", NULL, &asp0_clk),
+ 	CLK(NULL, "rto", &rto_clk),
+ 	CLK(NULL, "mjcp", &mjcp_clk),
+@@ -616,6 +616,8 @@
+ 
+ EVT_CFG(DM365,	EVT2_ASP_TX,         0,     1,    0,     false)
+ EVT_CFG(DM365,	EVT3_ASP_RX,         1,     1,    0,     false)
++EVT_CFG(DM365,	EVT2_VC_TX,          0,     1,    1,     false)
++EVT_CFG(DM365,	EVT3_VC_RX,          1,     1,    1,     false)
+ #endif
+ };
+ 
+@@ -996,6 +998,31 @@
+ 	.resource	= dm365_asp_resources,
+ };
+ 
++static struct resource dm365_vc_resources[] = {
++	{
++		.start	= DAVINCI_DM365_VC_BASE,
++		.end	= DAVINCI_DM365_VC_BASE + SZ_1K - 1,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= DAVINCI_DMA_VC_TX,
++		.end	= DAVINCI_DMA_VC_TX,
++		.flags	= IORESOURCE_DMA,
++	},
++	{
++		.start	= DAVINCI_DMA_VC_RX,
++		.end	= DAVINCI_DMA_VC_RX,
++		.flags	= IORESOURCE_DMA,
++	},
++};
++
++static struct platform_device dm365_vc_device = {
++	.name		= "davinci_voicecodec",
++	.id		= -1,
++	.num_resources	= ARRAY_SIZE(dm365_vc_resources),
++	.resource	= dm365_vc_resources,
++};
++
+ static struct resource dm365_rtc_resources[] = {
+ 	{
+ 		.start = DM365_RTC_BASE,
+@@ -1152,6 +1179,14 @@
+ 	platform_device_register(&dm365_asp_device);
+ }
+ 
++void __init dm365_init_vc(struct snd_platform_data *pdata)
++{
++	davinci_cfg_reg(DM365_EVT2_VC_TX);
++	davinci_cfg_reg(DM365_EVT3_VC_RX);
++	dm365_vc_device.dev.platform_data = pdata;
++	platform_device_register(&dm365_vc_device);
++}
++
+ void __init dm365_init_ks(struct davinci_ks_platform_data *pdata)
+ {
+ 	dm365_ks_device.dev.platform_data = pdata;
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/mux.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/mux.h	2011-05-18 13:02:58.780983027 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/mux.h	2011-05-18 13:03:00.777413080 -0600
+@@ -334,6 +334,8 @@
+ 	/* EDMA event muxing */
+ 	DM365_EVT2_ASP_TX,
+ 	DM365_EVT3_ASP_RX,
++	DM365_EVT2_VC_TX,
++	DM365_EVT3_VC_RX,
+ 	DM365_EVT26_MMC0_RX,
+ };
+ 
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-evm.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-evm.c	2011-05-18 13:02:58.868971813 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-evm.c	2011-05-18 13:03:00.777413080 -0600
+@@ -28,10 +28,12 @@
+ #include <mach/mux.h>
+ 
+ #include "../codecs/tlv320aic3x.h"
++#include "../codecs/cq93vc.h"
+ #include "../codecs/spdif_transciever.h"
+ #include "davinci-pcm.h"
+ #include "davinci-i2s.h"
+ #include "davinci-mcasp.h"
++#include "davinci-vcif.h"
+ 
+ #define AUDIO_FORMAT (SND_SOC_DAIFMT_DSP_B | \
+ 		SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_IB_NF)
+@@ -151,6 +153,22 @@
+ 	.ops = &evm_ops,
+ };
+ 
++static struct snd_soc_dai_link dm365_evm_dai = {
++#ifdef CONFIG_SND_DM365_AIC3X_CODEC
++	.name = "TLV320AIC3X",
++	.stream_name = "AIC3X",
++	.cpu_dai = &davinci_i2s_dai,
++	.codec_dai = &aic3x_dai,
++	.init = evm_aic3x_init,
++	.ops = &evm_ops,
++#elif defined(CONFIG_SND_DM365_VOICE_CODEC)
++	.name = "Voice Codec - CQ93VC",
++	.stream_name = "CQ93",
++	.cpu_dai = &davinci_vcif_dai,
++	.codec_dai = &cq93vc_dai,
++#endif
++};
++
+ static struct snd_soc_dai_link dm6467_evm_dai[] = {
+ 	{
+ 		.name = "TLV320AIC3X",
+@@ -177,7 +195,7 @@
+ 	.ops = &evm_ops,
+ };
+ 
+-/* davinci dm6446, dm355 or dm365 evm audio machine driver */
++/* davinci dm6446, dm355 evm audio machine driver */
+ static struct snd_soc_card snd_soc_card_evm = {
+ 	.name = "DaVinci EVM",
+ 	.platform = &davinci_soc_platform,
+@@ -185,6 +203,15 @@
+ 	.num_links = 1,
+ };
+ 
++/* davinci dm365 evm audio machine driver */
++static struct snd_soc_card dm365_snd_soc_card_evm = {
++	.name = "DaVinci DM365 EVM",
++	.platform = &davinci_soc_platform,
++	.dai_link = &dm365_evm_dai,
++	.num_links = 1,
++};
++
++
+ /* davinci dm6467 evm audio machine driver */
+ static struct snd_soc_card dm6467_snd_soc_card_evm = {
+ 	.name = "DaVinci DM6467 EVM",
+@@ -217,6 +244,17 @@
+ };
+ 
+ /* evm audio subsystem */
++static struct snd_soc_device dm365_evm_snd_devdata = {
++	.card = &dm365_snd_soc_card_evm,
++#ifdef CONFIG_SND_DM365_AIC3X_CODEC
++	.codec_dev = &soc_codec_dev_aic3x,
++	.codec_data = &aic3x_setup,
++#elif defined(CONFIG_SND_DM365_VOICE_CODEC)
++	.codec_dev = &soc_codec_dev_cq93vc,
++#endif
++};
++
++/* evm audio subsystem */
+ static struct snd_soc_device dm6467_evm_snd_devdata = {
+ 	.card = &dm6467_snd_soc_card_evm,
+ 	.codec_dev = &soc_codec_dev_aic3x,
+@@ -244,12 +282,15 @@
+ 	int index;
+ 	int ret;
+ 
+-	if (machine_is_davinci_evm() || machine_is_davinci_dm365_evm()) {
++	if (machine_is_davinci_evm()) {
+ 		evm_snd_dev_data = &evm_snd_devdata;
+ 		index = 0;
+ 	} else if (machine_is_davinci_dm355_evm()) {
+ 		evm_snd_dev_data = &evm_snd_devdata;
+ 		index = 1;
++	} else if (machine_is_davinci_dm365_evm()) {
++		evm_snd_dev_data = &dm365_evm_snd_devdata;
++		index = 0;
+ 	} else if (machine_is_davinci_dm6467_evm()) {
+ 		evm_snd_dev_data = &dm6467_evm_snd_devdata;
+ 		index = 0;

@@ -1,0 +1,200 @@
+#
+# Ridgerun BSP Configuration file for DM365
+#
+
+menu "Architecture configurations"
+
+comment "SDRAM Definitions"
+
+config BSP_ARCH_SDRAM_BASE
+	hex "SDRAM Base address"
+	default "0x80000000"
+	help
+	    Physical address of the start of SDRAM
+
+config BSP_ARCH_SDRAM_SIZE
+	hex "SDRAM size"
+	default "0x10000000"
+	help	
+	    Size of SDRAM
+
+comment "SDRAM Memory map"
+
+config BSP_ARCH_KERNEL_ATAGS_ADDRESS
+	hex "Kernel ATAGS parameter address"
+	default 0x80000100 
+	help
+	    This is the address where the ATAGS parameters for the ARM  kernel 
+	    will reside. It's used by the bootloader and the kernel. Don't change
+	    unless you know what are you doing.
+
+config BSP_ARCH_KERNEL_LOAD_ADDRESS
+	hex "Kernel physical start address (multiple of 4096 bytes)"
+	default 0x80008000 
+	help
+	    This is the default kernel load address. However this value can be
+	    change at runtime since the kernel entry is position independent
+
+config BSP_ARCH_KERNEL_ENTRY_ADDRESS
+	hex "Kernel entry physical address"
+	default 0x80008000 
+	help
+	    This is the default kernel load address. However this value can be
+	    change at runtime since the kernel entry is position independent
+
+config BSP_ARCH_KERNEL_COMPRESS
+	bool "Use kernel compression"
+	default y
+	help
+	Compress the kernel image in flash and decompress it when booting.
+
+config BSP_ARCH_KERNEL_ZTEXTADDR
+	depends on BSP_ARCH_KERNEL_COMPRESS
+	hex "Decompressor start address"
+	default "0x81E00000"
+	help
+	Start address of decompressor from the SDRAM base.
+       	
+	You normally call the kernel at this address to start it booting.
+	
+	This address will hold the decompressor logic that will extract the
+	compressed kernel. For this decompression a work area is going to be used
+	and the extracted kernel is going to be let at the SDRAM base address.
+	
+config BSP_ARCH_KERNEL_ZBSSADDR
+	depends on BSP_ARCH_KERNEL_COMPRESS
+        hex "Decompressor working area start address"
+        default "0x81F00000"
+        help
+	Start address of zero-initialised work area for the decompressor.
+
+	This work area is going to be used just for the decompression steps,
+	then it will be free.
+
+choice
+	prompt "Video Output"
+
+config BSP_VIDEO_OUTPUT_COMPONENT
+	bool "Component"
+
+config BSP_VIDEO_OUTPUT_COMPOSITE
+	bool "Composite"
+
+config BSP_VIDEO_OUTPUT_PRGB
+	bool "PRGB"
+endchoice
+
+choice
+	prompt "Component Standard"
+	depends on BSP_VIDEO_OUTPUT_COMPONENT
+
+config BSP_VIDEO_MODE_720P_60
+	bool "720P-60"
+
+config BSP_VIDEO_MODE_1080I_30
+	bool "1080I-30"
+	
+endchoice
+
+choice
+	prompt "Maximum Video Output Buffer Size"
+
+config BSP_VIDEO_OUTPUT_SIZE_480P
+	bool "480P"
+
+config BSP_VIDEO_OUTPUT_SIZE_720P
+	depends on BSP_VIDEO_OUTPUT_COMPONENT || BSP_VIDEO_OUTPUT_PRGB
+	bool "720P"
+
+config BSP_VIDEO_OUTPUT_SIZE_1080I
+	depends on BSP_VIDEO_OUTPUT_COMPONENT || BSP_VIDEO_OUTPUT_PRGB
+	bool "1080I"
+
+config BSP_VIDEO_OUTPUT_SIZE_OTHER
+	bool "Other (enter buffer size and fb specs)"
+	depends on BSP_VIDEO_OUTPUT_PRGB
+
+endchoice
+
+config BSP_VIDEO_OUTPUT_OSD0_SPEC
+	string "OSD0 Specs (HxWxBPP,(HxWxBPPxNbufs)K)"
+	default "720x480x16,1350K"
+	depends on BSP_VIDEO_OUTPUT_SIZE_OTHER
+
+config BSP_VIDEO_DISPLAY_BUFFER_SIZE
+	int "Buffer size for v4l2 output (recommend 3 buffers min)"
+	default "3145728"
+	depends on BSP_VIDEO_OUTPUT_SIZE_OTHER
+
+choice
+	prompt "Maximum Video Input Buffer Size"
+
+config BSP_VIDEO_INPUT_SIZE_480P
+	bool "480P"
+
+config BSP_VIDEO_INPUT_SIZE_720P
+	bool "720P"
+
+config BSP_VIDEO_INPUT_SIZE_1080P
+        bool "1080P"
+
+config BSP_VIDEO_INPUT_SIZE_OTHER
+	bool "Other (enter buffer size)"
+endchoice
+
+config BSP_VIDEO_CAPTURE_BUFFER_SIZE
+	int "Buffer size for v4l2 input (recommend 3 buffers min)"
+	default "6291456"
+	depends on BSP_VIDEO_INPUT_SIZE_OTHER
+
+# This arch supports SD card boot mode
+config BSP_ARCH_SUPPORTS_SD_CARD_INSTALLER_MODE
+	bool
+	default y
+
+config BSP_ARCH_SUPPORTS_JFFS2FS
+	bool
+	default y
+
+config BSP_ARCH_SUPPORTS_UBIFS
+	bool
+	default y
+
+# This only works if we have patched the kernel and uboot
+# to write 0xFF ECCs for a full 0xFF page
+config BSP_ARCH_SUPPORTS_NAND_SUBPAGES
+	bool
+	default y
+
+config BSP_ARCH_SD_CARD_INSTALLER_BOOTLOADER_OUT_OF_FS
+	bool
+	default y
+
+config BSP_ARCH_SD_CARD_INSTALLER_UBL
+	string
+	default "ubl_DM36x_sdmmc.bin"
+
+config BSP_ARCH_INSTALLER_MIN_UBOOT_FLASH_BLK_START
+	int
+	default "25"
+
+config BSP_ARCH_INSTALLER_IPL_GENERATION_TARGET
+	string
+	default "gen_ipl_nandbin"
+
+config BSP_ARCH_INSTALLER_UBOOT_FLASH_GENERATION_TARGET
+	string
+	default "gen_uboot_nandbin"
+
+config BSP_ARCH_INSTALLER_MIN_IPL_FLASH_BLK_START
+	int
+	default 1 
+
+config BSP_ARCH_SUPPORTS_LTT_CONTROL_0_87
+	bool
+	default y
+
+source bsp/mach/Config
+
+endmenu
+

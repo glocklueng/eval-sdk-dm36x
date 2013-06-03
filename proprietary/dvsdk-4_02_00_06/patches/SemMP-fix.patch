@@ -1,0 +1,29 @@
+Index: dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/osal/linux/SemMP_posix.c
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/osal/linux/SemMP_posix.c	2011-03-24 16:05:12.000000000 -0600
++++ dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/osal/linux/SemMP_posix.c	2013-03-19 11:32:36.028936417 -0600
+@@ -38,6 +38,7 @@
+ 
+ #include <unistd.h>
+ #include <stdlib.h>
++#include <errno.h>
+ #include <sys/types.h>
+ #include <sys/ipc.h>
+ #include <sys/sem.h>
+@@ -354,10 +355,12 @@
+     semBuf.sem_flg = SEM_UNDO;
+ 
+     /* TODO: Figure out how to do timeout */
+-    if (semop(sem->id, &semBuf, 1) == -1) {
+-        status = SemMP_EFAIL;
+-        GT_1trace(curTrace, GT_7CLASS, "SemMP_pend [0x%x] failed\n", sem->id);
+-        GT_assert(curTrace, status == SemMP_EOK);
++    while (semop(sem->id, &semBuf, 1) == -1) {
++        if (errno != EINTR) {
++            status = SemMP_EFAIL;
++            GT_1trace(curTrace, GT_7CLASS, "SemMP_pend [0x%x] failed\n", sem->id);
++            GT_assert(curTrace, status == SemMP_EOK);
++        }
+     }
+ 
+     GT_2trace(curTrace, GT_ENTER, "Leaving SemMP_pend> sem[0x%x] status[%d]\n",

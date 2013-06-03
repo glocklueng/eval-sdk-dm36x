@@ -1,0 +1,28 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-dev.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-dev.c	2011-10-27 18:14:33.794864006 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-dev.c	2011-10-27 18:15:40.438935566 -0600
+@@ -422,6 +422,10 @@
+ 	if (!vdev->release)
+ 		return -EINVAL;
+ 
++	/* v4l2_fh support */
++	spin_lock_init(&vdev->fh_lock);
++	INIT_LIST_HEAD(&vdev->fh_list);
++
+ 	/* Part 1: check device type */
+ 	switch (type) {
+ 	case VFL_TYPE_GRABBER:
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-event.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-event.c	2011-11-07 15:07:46.982298600 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/v4l2-event.c	2011-11-07 15:09:28.006372386 -0600
+@@ -153,7 +153,7 @@
+ 	struct v4l2_events *events = fh->events;
+ 	struct v4l2_subscribed_event *sev;
+ 
+-	WARN_ON(!spin_is_locked(&fh->vdev->fh_lock));
++	assert_spin_locked(&fh->vdev->fh_lock);
+ 
+ 	list_for_each_entry(sev, &events->subscribed, list) {
+ 		if (sev->type == type)

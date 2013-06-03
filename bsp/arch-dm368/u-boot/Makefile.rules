@@ -1,0 +1,39 @@
+#$L$
+# Copyright (C) 2011 Ridgerun (http://www.ridgerun.com).
+#
+#$L$
+
+.PHONY: arch_build arch_post_build arch_clean
+
+NAND_UBL=$(IMAGEDIR)/ubl_DM36x_nand
+
+CPPFLAGS+=-DCONFIG_SPLASH_ADDRESS=$(CONFIG_BTLR_SPLASH_ADDRESS)
+ifeq ($(CONFIG_BTLR_SPLASH_COMPOSITE),y)
+CPPFLAGS+=-DCONFIG_SPLASH_COMPOSITE=1
+endif
+ifeq ($(CONFIG_BTLR_SPLASH_LCD),y)
+CPPFLAGS+=-DCONFIG_SPLASH_LCD=1
+endif
+ifeq ($(CONFIG_BTLR_SPLASH_COLOR_BARS),y)
+CPPFLAGS+=-DCONFIG_SPLASH_COLOR_BARS=1
+endif
+
+arch_build:
+	$(V) $(MAKE) -C ti-flash-utils build_dm365
+
+arch_post_build:
+	@ #Add the descriptor header needed to flash and run properly UBL and U-boot
+
+PAGESIZE?=2048
+
+gen_ipl_nandbin:
+	$(V) mono ti-flash-utils/src/DM36x/GNU/bc_DM36x.exe -pageSize $(PAGESIZE) -blockNum 1 \
+	   $(NAND_UBL).bin -o $(IMAGEDIR)/ubl_nand.nandbin $(QOUT)
+
+gen_uboot_nandbin:
+	$(V) mono ti-flash-utils/src/DM36x/GNU/bc_DM36x.exe -uboot -pageSize $(PAGESIZE) -blockNum 25 \
+	   -startAddr $(CONFIG_UBOOT_RAM_ADDRS) -loadAddr $(CONFIG_UBOOT_RAM_ADDRS) \
+	   $(BOOTLOADERIMAGE) -o $(BOOTLOADERIMAGE).nandbin $(QOUT)
+
+arch_clean:
+	$(V) $(MAKE) -C ti-flash-utils clean

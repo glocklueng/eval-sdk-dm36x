@@ -1,0 +1,86 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm368-leopard.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm368-leopard.c	2011-07-07 09:31:28.423489874 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm368-leopard.c	2011-07-07 09:31:31.007488927 -0600
+@@ -50,6 +50,7 @@
+ #include <mach/gpio.h>
+ #include <linux/videodev2.h>
+ #include <media/davinci/videohd.h>
++#include <media/davinci/dm365_generic_prgb_encoder.h>
+ #include <media/tvp514x.h>
+ #include <media/tvp7002.h>
+ 
+@@ -333,7 +334,7 @@
+ 
+ }
+ 
+-static void dm368leopard_lcdout_configure(void)
++static void dm368leopard_prgb_out_configure(void)
+ {
+ 	/*
+ 	 * R/G/B 0 and 1 pins are multiplexed with GPIOs
+@@ -376,6 +377,33 @@
+ 	i2c_register_board_info(1, i2c_info, ARRAY_SIZE(i2c_info));
+ }
+ 
++int set_prgb_pixel_clk_output(unsigned int required_clk_rate);
++
++static struct davinci_gen_prgb_pdata gen_prgb_data = {
++	.xres = 1280,
++	.yres = 720,
++	.fps = {60, 1},
++	.pixel_clock_khz = 0,
++	.left_margin = 300,
++	.right_margin = 70,
++	.upper_margin = 26,
++	.lower_margin = 3,
++	.hsync_len = 80,
++	.vsync_len = 5,
++	.flags = 0,
++	.clock_set_function = NULL,
++};
++
++static struct platform_device gen_prgb_device = {
++	.name			= PRGB_ENCODER_DRV_NAME,
++	.id				= 0,
++	.num_resources	= 0,
++	.resource		= NULL,
++	.dev			= {
++		.platform_data	= &gen_prgb_data,
++	},
++};
++
+ static struct davinci_nand_pdata davinci_nand_data = {
+ 	.mask_chipsel		= 0,
+ 	.ecc_mode		= NAND_ECC_HW,
+@@ -405,8 +433,9 @@
+ 	},
+ };
+ 
+-static struct platform_device *dm368_leopard_nand_devices[] __initdata = {
++static struct platform_device *dm368_leopard_devices[] __initdata = {
+ 	&davinci_nand_device,
++	&gen_prgb_device,
+ };
+ 
+ 
+@@ -428,7 +457,7 @@
+ 	dm368leopard_emac_configure();
+ 	dm368leopard_usb_configure();
+ 	dm368leopard_mmc_configure();
+-	dm368leopard_lcdout_configure();
++	dm368leopard_prgb_out_configure();
+ 
+ 	davinci_setup_mmc(0, &dm368leopard_mmc_config);
+ 
+@@ -440,8 +469,8 @@
+ #endif
+ 	dm365_init_rtc();
+ 
+-	platform_add_devices(dm368_leopard_nand_devices,
+-		ARRAY_SIZE(dm368_leopard_nand_devices));
++	platform_add_devices(dm368_leopard_devices,
++		ARRAY_SIZE(dm368_leopard_devices));
+ }
+ 
+ static __init void dm368_leopard_irq_init(void)

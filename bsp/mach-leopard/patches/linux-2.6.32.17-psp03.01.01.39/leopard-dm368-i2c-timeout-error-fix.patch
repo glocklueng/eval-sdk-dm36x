@@ -1,0 +1,26 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm368-leopard.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm368-leopard.c	2011-05-09 10:52:40.748350639 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm368-leopard.c	2011-05-09 10:55:08.081763404 -0600
+@@ -76,6 +76,8 @@
+ static struct davinci_i2c_platform_data i2c_pdata = {
+ 	.bus_freq	= 400	/* kHz */,
+ 	.bus_delay	= 0	/* usec */,
++	.sda_pin        = 21,
++	.scl_pin        = 20,
+ };
+ 
+ #if defined(CONFIG_SOC_CAMERA_MT9P031) || defined(CONFIG_SOC_CAMERA_MT9P031_MODULE)
+@@ -365,6 +367,11 @@
+ 
+ static void __init leopard_init_i2c(void)
+ {
++	davinci_cfg_reg(DM365_GPIO20);
++	gpio_request(20, "i2c-scl");
++	gpio_direction_output(20, 0);
++	davinci_cfg_reg(DM365_I2C_SCL);
++
+ 	davinci_init_i2c(&i2c_pdata);
+ 	i2c_register_board_info(1, i2c_info, ARRAY_SIZE(i2c_info));
+ }
+

@@ -1,0 +1,42 @@
+#!/bin/sh
+
+/bin/mount -t proc proc /proc
+/bin/mount -t sysfs none /sys
+
+/bin/mount /tmp
+
+cp -R /dev/* /tmp
+/bin/mount /dev
+mv /tmp/* /dev
+
+# Populate the device tree
+/sbin/mdev -s
+
+cp -R /var/* /tmp
+/bin/mount /var
+mv /tmp/* /var
+
+# System tweaks for a nice embedded system
+# Set mdev as hotplug manager
+echo "/sbin/mdev" >/sys/kernel/uevent_helper
+# Set the overcommit behavior disabled
+if [ -e /proc/sys/vm/overcommit_memory ] ; then
+    echo "1" >/proc/sys/vm/overcommit_memory
+else
+    echo "WARNING: Unable to disable overcommit memory, missing /proc entry"
+fi
+
+# Set hostname
+if [ -f /etc/hostname ] ; then
+    /bin/hostname -F /etc/hostname
+fi
+
+cat /etc/motd
+
+if [ -e /etc/rc.sysv ] ; then
+    /etc/rc.sysv
+fi
+
+if [ -e /etc/rc.local ] ; then
+    /etc/rc.local
+fi

@@ -1,0 +1,3 @@
+EVM-dm365-support.patch
+evm-dm365-i2c-timeout-error-fix.patch
+correct-nand-support.patch

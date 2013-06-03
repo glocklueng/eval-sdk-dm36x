@@ -1,0 +1,13 @@
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile.app
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile.app	2011-02-23 11:56:44.567799299 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile.app	2011-02-23 11:57:02.963796656 -0600
+@@ -94,7 +94,7 @@
+ TARGET = $(notdir $(CURDIR))
+ 
+ # Package path for the XDC tools
+-XDCPATH = $(USER_XDC_PATH);$(DMAI_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/packages;$(FC_INSTALL_DIR)/packages;$(LINK_INSTALL_DIR);$(XDAIS_INSTALL_DIR)/packages;$(CMEM_INSTALL_DIR)/packages;$(CODEC_INSTALL_DIR)/packages;$(BIOS_INSTALL_DIR)/packages;$(BIOSUTILS_INSTALL_DIR)/packages;$(RTDX_INSTALL_DIR)/packages;$(EDMA3_LLD_INSTALL_DIR)/packages;$(LPM_INSTALL_DIR)/packages;$(C6ACCEL_INSTALL_DIR)/soc/packages
++XDCPATH = $(USER_XDC_PATH);$(DMAI_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/examples;$(FC_INSTALL_DIR)/packages;$(LINK_INSTALL_DIR);$(XDAIS_INSTALL_DIR)/packages;$(CMEM_INSTALL_DIR)/packages;$(CODEC_INSTALL_DIR)/packages;$(BIOS_INSTALL_DIR)/packages;$(BIOSUTILS_INSTALL_DIR)/packages;$(RTDX_INSTALL_DIR)/packages;$(EDMA3_LLD_INSTALL_DIR)/packages;$(LPM_INSTALL_DIR)/packages;$(C6ACCEL_INSTALL_DIR)/soc/packages
+ 
+ BUILD_TARGET	= $(PLATFORM_OS)/$(TARGET)_$(PLATFORM_DEVICE)
+ XDC_CFG		= $(PLATFORM_OS)/$(TARGET)_$(PLATFORM_DEVICE)_config

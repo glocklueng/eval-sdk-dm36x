@@ -1,0 +1,17 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm365-evm.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm365-evm.c	2011-05-18 16:35:45.140992149 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/board-dm365-evm.c	2011-05-18 16:36:18.993425925 -0600
+@@ -960,7 +960,12 @@
+ 	/* maybe setup mmc1/etc ... _after_ mmc0 */
+ 	evm_init_cpld();
+ 
++#ifdef CONFIG_SND_DM365_AIC3X_CODEC
+ 	dm365_init_asp(&dm365_evm_snd_data);
++#elif defined(CONFIG_SND_DM365_VOICE_CODEC)
++	dm365_init_vc(&dm365_evm_snd_data);
++#endif
++
+ 	dm365_init_rtc();
+ 	dm365_init_ks(&dm365evm_ks_data);
+ 
