@@ -11,7 +11,7 @@ include bsp/classes/flags.defs
 # Used to the graphical output indexation
 TABINDEX ?= \040
 
-.PHONY: build config bspconfig bspconfig_batch preconfig chkconfig buildfs \
+.PHONY: build config bspconfig bspconfig_batch preconfig buildfs \
 clean prebuild header kernel bootloader fs update coreconfig \
 help help_targets help_parameters help_examples install
 
@@ -51,11 +51,13 @@ endif
 
 prebuild::
 
-patch:: $(foreach COMP, $(COMPONENTS), $(COMP)_patch)
+patch:: .oscheck header $(foreach COMP, $(COMPONENTS), $(COMP)_patch)
 
-buildfs:: $(foreach COMP, $(COMPONENTS), $(COMP)_buildfs)
+buildfs:: .oscheck header $(foreach COMP, $(COMPONENTS), $(COMP)_buildfs)
 
-unpatch:: $(foreach COMP, $(COMPONENTS), $(COMP)_unpatch)
+unpatch_noheader: $(foreach COMP, $(COMPONENTS), $(COMP)_unpatch)
+
+unpatch:: .oscheck header unpatch_noheader
 
 clean:: .oscheck header $(foreach COMP, $(COMPONENTS), $(COMP)_clean)
 	@$(MAKE) -C bsp clean $(MAKE_CALL_PARAMS)
@@ -113,6 +115,7 @@ kernel=""
 endif
 
 coreconfig: .oscheck header
+	$(V)$(MAKE) -C kernel $(KERNEL)
 	$(V)bsp/scripts/coreconfig $(board) $(toolchain) $(bootloader) $(kernel)
 
 doc: .oscheck header 
@@ -225,7 +228,7 @@ endif
 # Component Function template call
 define COMP_template
 .PHONY: $(1)$(2)
-$(1)$(2): header
+$(1)$(2):
 	$(V)if [ -d $(1) ] ; then \
 	  $(ECHO) "Processing $(1)..."; \
 	  $(EXECUTE) $(MAKE) -C $(1) $(3) $(MAKE_CALL_PARAMS); \
@@ -237,7 +240,6 @@ $(foreach COMP, $(COMPONENTS), $(eval $(call COMP_template,$(COMP),_patch,patch)
 $(foreach COMP, $(COMPONENTS), $(eval $(call COMP_template,$(COMP),_build)))
 $(foreach COMP, $(COMPONENTS), $(eval $(call COMP_template,$(COMP),_buildfs,buildfs)))
 $(foreach COMP, $(COMPONENTS), $(eval $(call COMP_template,$(COMP),_preconfig,preconfig)))
-$(foreach COMP, $(COMPONENTS), $(eval $(call COMP_template,$(COMP),_chkconfig,chkconfig)))
 $(foreach COMP, $(COMPONENTS), $(eval $(call COMP_template,$(COMP),_unpatch,unpatch)))
 $(foreach COMP, $(COMPONENTS), $(eval $(call COMP_template,$(COMP),_clean,clean)))
 

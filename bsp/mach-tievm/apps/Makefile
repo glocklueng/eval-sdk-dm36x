@@ -35,6 +35,9 @@ endif
 include $(DEVDIR)/bsp/mach/Make.conf
 
 include $(DEVDIR)/bsp/classes/dependencies.defs
+
+patch: dependency_patch
+
 build: dependency_build
 
 preconfig:
@@ -48,3 +51,5 @@ preconfig:
 		echo -e "source fs/mach/$$i/Config \n\n" >>ConfigExtra ; \
 	    fi ; \
 	done
+
+unpatch: dependency_unpatch
