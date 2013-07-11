@@ -1,0 +1,5 @@
+config  PROPRIETARY_RRAEW_DEMO
+	bool "librraew-demo"
+	default n
+	help
+	    RidgeRun AEW library for TI DM368/DM365 SoC (Demo Version)

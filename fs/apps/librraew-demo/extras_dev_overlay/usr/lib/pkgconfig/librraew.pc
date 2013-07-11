@@ -1,0 +1,12 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+vapidir=${prefix}/share/vala/vapi
+valaflags=--pkg librraew --vapidir=${vapidir}
+
+Name: librraew
+Description: RidgeRun AEW Library
+Version: 1.1
+Libs: -L${libdir} -lrraew
+Cflags: -I${includedir}/librraew
