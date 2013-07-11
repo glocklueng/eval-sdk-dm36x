@@ -16,4 +16,4 @@ install:  rrsdk_install
 
 clean:
 
-include ../../bsp/classes/rrsdk.class
+include ../../../bsp/classes/rrsdk.class
