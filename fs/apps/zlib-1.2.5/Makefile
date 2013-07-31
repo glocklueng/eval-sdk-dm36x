@@ -18,7 +18,7 @@ FETCHER_EXTRACT_DIRECTORY_NAME=src
 build: rrfetched built
 
 built: configured
-	$(V) $(MAKE) -j $(BSP_NCPU) -C $(ARCH) $(QOUT)
+	$(V) $(MAKE) -j 1 -C $(ARCH) $(QOUT)
 
 configured:
 	$(V) $(RM) -rf $(ARCH) $(QOUT)
