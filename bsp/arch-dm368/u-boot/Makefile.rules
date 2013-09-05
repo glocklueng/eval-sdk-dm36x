@@ -31,7 +31,7 @@ gen_ipl_nandbin:
 	   $(NAND_UBL).bin -o $(IMAGEDIR)/ubl_nand.nandbin $(QOUT)
 
 gen_uboot_nandbin:
-	$(V) mono ti-flash-utils/src/DM36x/GNU/bc_DM36x.exe -uboot -pageSize $(PAGESIZE) -blockNum 25 \
+	$(V) mono ti-flash-utils/src/DM36x/GNU/bc_DM36x.exe -uboot -pageSize $(PAGESIZE) -blockNum $(BLOCKNUM) \
 	   -startAddr $(CONFIG_UBOOT_RAM_ADDRS) -loadAddr $(CONFIG_UBOOT_RAM_ADDRS) \
 	   $(BOOTLOADERIMAGE) -o $(BOOTLOADERIMAGE).nandbin $(QOUT)
 
