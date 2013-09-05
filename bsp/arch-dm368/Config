@@ -175,8 +175,8 @@ config BSP_ARCH_SD_CARD_INSTALLER_UBL
 	default "ubl_DM36x_sdmmc.bin"
 
 config BSP_ARCH_INSTALLER_MIN_UBOOT_FLASH_BLK_START
-	int
-	default "25"
+	string
+	default "0x19"
 
 config BSP_ARCH_INSTALLER_IPL_GENERATION_TARGET
 	string
