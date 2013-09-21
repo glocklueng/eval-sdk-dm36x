@@ -826,7 +826,6 @@ sub install_filesystem {
             fatal_error("no valid filesystem format defined for the SD");
         }
 
-
         print YELLOW BLINK "  WARNING!!!\n";
         print "  You are about to format your device ${SD_DEVICE}1, please enter 'yes' to continue\n  ";
         my $ANSWER = <STDIN>;
@@ -862,7 +861,9 @@ sub install_filesystem {
         my $FS_OFFSET_ON_BOARD;
         my $FS_SIZE_ON_BOARD;
         my $FS_PARTITION_SIZE_ON_BOARD;
-
+        my $FS_MD5SUM_ON_BOARD;
+        my $FS_MD5SUM_NEW;
+        
         # File system load address computation
         if ($CONFIG_FS_TARGET_REQUIRES_INSTALLER_GENERATION) {
             printf "  Generating file system using flash geometry...\n";
@@ -882,15 +883,24 @@ sub install_filesystem {
             $FS_SIZE_ON_BOARD = 0;
             $FS_OFFSET_ON_BOARD = 0;
             $FS_PARTITION_SIZE_ON_BOARD = 0;
+            $FS_MD5SUM_ON_BOARD = 0;
         } else {
             # Load onboard file system values
             $FS_SIZE_ON_BOARD = read_uboot_value("fssize");
             $FS_OFFSET_ON_BOARD = read_uboot_value("fsoffset");
             $FS_PARTITION_SIZE_ON_BOARD = read_uboot_value("fspartitionsize");
+            $FS_MD5SUM_ON_BOARD = read_uboot_value("fsmd5sum");
         }
 
         my $START_BLK = hex($FS_OFFSET) / hex($FLASH_BLK_SIZE);
         my $SIZE = hex($FS_PARTITION_SIZE) / hex($FLASH_BLK_SIZE);
+
+        # Do the checksum on the filesystem file, not the uImage, since the uImage may be
+        # regenerated often by the fs installation
+        my $FSFILE = $FSIMAGE;
+        $FSFILE =~ s/(.*).uImage/$1/s;
+        $FS_MD5SUM_NEW = `md5sum $FSFILE | cut -f1 -d' '`;
+        chomp($FS_MD5SUM_NEW);
 
         if ($GENERATE_EXTERNAL_INSTALLER eq "y") {
             my $OFFSET = sprintf("0x%x",$START_BLK * hex($FLASH_BLK_SIZE));
@@ -898,12 +908,14 @@ sub install_filesystem {
             set_external_installer_value("FS_OFFSET",$OFFSET);
             set_external_installer_value("FS_PSIZE",$FS_PARTITION_SIZE);
             set_external_installer_value("FS_SIZE",$FSSIZE);
+            set_external_installer_value("FS_CHECKSUM",$FS_MD5SUM_NEW);
             return;
         }
 
         if((hex($FSSIZE) != hex($FS_SIZE_ON_BOARD)) ||
            (hex($FS_PARTITION_SIZE) != hex($FS_PARTITION_SIZE_ON_BOARD)) ||
            (hex($FS_OFFSET) != hex($FS_OFFSET_ON_BOARD)) ||
+           ($FS_MD5SUM_NEW ne $FS_MD5SUM_ON_BOARD) ||
            ($INSTALLATION_MODE eq "fs") ||
            ($FORCEINSTALL eq "yes")) {
             print "  Loading file system image...\n";
@@ -911,7 +923,6 @@ sub install_filesystem {
             send_uboot_cmd("setenv autostart yes\n");
 
             # Saving the file system to flash
-
             flash_erase_cmd($START_BLK,$SIZE);
 
             print "  Saving file system...\n";
@@ -923,6 +934,11 @@ sub install_filesystem {
             send_uboot_cmd("setenv fssize 0x$FSSIZE\n");
             send_uboot_cmd("setenv fspartitionsize 0x$FS_PARTITION_SIZE\n");
             send_uboot_cmd("setenv fsoffset 0x$FS_OFFSET\n");
+            
+            # Saving new md5sum value
+            print "  Saving new file system md5sum value...\n";
+            send_uboot_cmd("setenv fsmd5sum $FS_MD5SUM_NEW\n");
+            
             send_uboot_cmd("saveenv\n",$long_timeout);
         } else {
             print "  File system doesn't need to be loaded, since file system size match on board and host\n";
