@@ -894,12 +894,7 @@ sub install_filesystem {
 
         my $START_BLK = hex($FS_OFFSET) / hex($FLASH_BLK_SIZE);
         my $SIZE = hex($FS_PARTITION_SIZE) / hex($FLASH_BLK_SIZE);
-
-        # Do the checksum on the filesystem file, not the uImage, since the uImage may be
-        # regenerated often by the fs installation
-        my $FSFILE = $FSIMAGE;
-        $FSFILE =~ s/(.*).uImage/$1/s;
-        $FS_MD5SUM_NEW = `md5sum $FSFILE | cut -f1 -d' '`;
+        my $FS_MD5SUM_NEW = `md5sum $FSIMAGE | cut -f1 -d' '`;
         chomp($FS_MD5SUM_NEW);
 
         if ($GENERATE_EXTERNAL_INSTALLER eq "y") {
