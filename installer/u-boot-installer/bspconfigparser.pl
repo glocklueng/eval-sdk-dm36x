@@ -5,7 +5,7 @@ open FH, "<", "$ARGV[0]" or die $!;
 while (<FH>)
 {
     if (($_ =~ /=/) && 
-	($_ =~ /BTLR/ || $_ =~ /INSTALLER/ || $_ =~ /UBOOT/ || $_ =~ /FS_TARGET/ )) {
+	($_ =~ /BTLR/ || $_ =~ /INSTALLER/ || $_ =~ /UBOOT/ || $_ =~ /FS_TARGET/ || $_ =~ /SDRAM/)) {
 	my @VALUE = split(/=/,$_,2);
 	chomp(@VALUE[1]);
 	if (@VALUE[1] =~ /^\".*\"/) {

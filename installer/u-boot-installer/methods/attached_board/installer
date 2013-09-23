@@ -178,11 +178,13 @@ my $FSIMAGE = "$DEVDIR/images/fsimage.uImage";
 my $KERNEL_OFFSET;
 my $FS_OFFSET;
 my $MTDPARTS;
+
 # Kernel and file system images sizes
 my $KSIZE;
 my $KSIZE_ALIGNED;
 my $FSSIZE;
 my $FSSIZE_ALIGNED;
+my $TFTP_MAX_TRANSFER_SIZE = 0;
 
 # Partition sizes
 my $UBOOT_PARTITION_SIZE;
@@ -450,6 +452,10 @@ sub initial_computations {
     $KERNEL_OFFSET = sprintf("%X",hex($UBOOT_PARTITION_SIZE));
     }
 
+    if ($INSTALL_METHOD eq "TFTP") {
+        $TFTP_MAX_TRANSFER_SIZE = tftp_max_transfer_size();
+    }
+    
     calculate_fs_size();
 }
 
@@ -481,6 +487,24 @@ sub config_mtd_partitions {
     if($MTD_EXTRA_PARTITIONS ne ""){
         $MTDPARTS .= ",$MTD_EXTRA_PARTITIONS";
     }
+}
+
+# ==============================================================================
+# Sets the maximum file size allowed for a TFTP transfer (in bytes and
+# decimal).
+#
+# TFTP tranfers are previously loaded to RAM using the 'tftp' uboot command,
+# and then flashed into NAND from RAM. This imposes the limitation on the
+# size of the transferred file to fit in the available RAM, between
+# CONFIG_INSTALLER_LOAD_ADDRS and the max possible RAM address.
+# ==============================================================================
+sub tftp_max_transfer_size() {
+    my $SDRAM_MAX_ADDR = 0;
+    
+    $SDRAM_MAX_ADDR = hex($CONFIG_BSP_ARCH_SDRAM_BASE) +
+        hex($CONFIG_BSP_ARCH_SDRAM_SIZE);
+    $TFTP_MAX_TRANSFER_SIZE = $SDRAM_MAX_ADDR -
+        hex($CONFIG_INSTALLER_LOAD_ADDRS);
 }
 
 # ==============================================================================
@@ -906,13 +930,18 @@ sub install_filesystem {
             set_external_installer_value("FS_CHECKSUM",$FS_MD5SUM_NEW);
             return;
         }
-
+        
         if((hex($FSSIZE) != hex($FS_SIZE_ON_BOARD)) ||
            (hex($FS_PARTITION_SIZE) != hex($FS_PARTITION_SIZE_ON_BOARD)) ||
            (hex($FS_OFFSET) != hex($FS_OFFSET_ON_BOARD)) ||
            ($FS_MD5SUM_NEW ne $FS_MD5SUM_ON_BOARD) ||
            ($INSTALLATION_MODE eq "fs") ||
            ($FORCEINSTALL eq "yes")) {
+               
+            if ($INSTALL_METHOD eq "TFTP" && hex($FSSIZE) > $TFTP_MAX_TRANSFER_SIZE) {
+                fatal_error("filesystem image size (" . hex($FSSIZE) . ") is larger than the allowed maximum TFTP transfer size (${TFTP_MAX_TRANSFER_SIZE})");
+            }
+               
             print "  Loading file system image...\n";
             load_file_to_ram($FSIMAGE);
             send_uboot_cmd("setenv autostart yes\n");
