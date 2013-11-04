@@ -258,8 +258,8 @@ config.site.sim:
 toolchain.cmake: toolchain.cmake.in
 	$(V) cp $< $@
 	$(V) sed -i -e "s/@CMAKE_SYSTEM_NAME@/$(shell uname)/" \
-	    -e "s?@CC@?$(CONFIG_TOOLCHAIN_PATH)/bin/$(CC)?" \
-	    -e "s?@CXX@?$(CONFIG_TOOLCHAIN_PATH)/bin/$(CXX)?" \
+	    -e "s?@CC@?\"$(TOOLCHAIN_PREFIX)-gcc\"?" \
+	    -e "s?@CXX@?\"$(TOOLCHAIN_PREFIX)-g++\"?" \
 	    -e "s?@FSDEV@?$(FSDEVROOT)?g" \
 	$@
 
