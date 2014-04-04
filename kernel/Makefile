@@ -6,9 +6,9 @@ include ../bsp/classes/rrsdk.class
 include $(CLASSES)/fetcher.defs
 include $(CLASSES)/flags.defs
 
-.PHONY: build real_build preconfig patch buildfs headers_install soft_clean clean
+.PHONY: build real_build preconfig patch buildfs headers_install modules_install soft_clean clean
 
-build: real_build headers_install
+build: real_build modules_install headers_install
 	$(V) $(ECHO) "Build complete"
 	$(V)touch $(BUILT_FLAG)
 
@@ -16,9 +16,6 @@ real_build: $(KERNEL) preconfig patch
 	$(V) ln -sf $(DEVDIR)/bsp/mach/bspconfig $(KERNEL)/.config
 	$(V) cat /dev/zero | $(MAKE) -C $(KERNEL) $(KFLAGS) oldconfig $(QOUT) 2>/dev/null
 	$(V) $(MAKE) -C $(KERNEL) $(KFLAGS)
-	$(V) if [ -d $(FSROOT) ] ; then \
-	    $(MAKE) -j $(BSP_NCPU) -C $(KERNEL) modules_install $(KFLAGS) INSTALL_MOD_PATH="$(FSROOT)" $(QOUT) ; \
-	fi
 	$(ARCH_KERNEL_RULES)
 ifeq ($(CONFIG_BSP_ARCH_KERNEL_COMPRESS),y)
 	$(Q)cp $(KERNEL)/arch/$(ARCH)/boot/zImage $(DEVDIR)/images/vmlinuz
@@ -62,13 +59,23 @@ PKG_TARBALL=$(KERNEL_TARBALL)
 FETCHER_EXTRACT_DIRECTORY_NAME=$(KERNEL)
 PKG_URL=$(KERNEL_URL)
 
-buildfs:
-	$(V) $(MAKE) -C $(KERNEL) $(KFLAGS) modules_install INSTALL_MOD_PATH="$(FSROOT)" $(QOUT)
+buildfs: modules_install
 
 headers_install: $(KERNEL)
 	$(V) $(MAKE) -C $(DEVDIR)/fs $(FSDEVROOT) $(QOUT)
 	$(V) $(MAKE) -C $(KERNEL) $@ $(KFLAGS) $(QOUT)
 	$(V) cp -R $(KERNEL)/usr/include/* $(FSDEVROOT)/usr/include
+
+modules_install: $(KERNEL)
+	$(V) if [ -d $(FSROOT) ] ; then \
+	  $(MAKE) -C $(KERNEL) $(KFLAGS) modules_install INSTALL_MOD_PATH="$(KERNEL)" $(QOUT) ; \
+	  if [ ! -d $(FSROOT)/lib/modules ] ; then \
+	      mkdir -p $(FSROOT)/lib/modules; \
+	  else \
+	      find . -name modules.dep* | xargs rm; \
+	  fi ; \
+	  cp -R $(KERNEL)/$(KERNEL)/lib/modules/* $(FSROOT)/lib/modules ; \
+	fi
 
 soft_clean: unpatch
 	$(V) if [ -d $(KERNEL) ] ; then \
