@@ -31,7 +31,7 @@ config-goals := $(filter $(config-goals-list), $(MAKECMDGOALS))
 build-goals  := $(filter $(build-goals-list),  $(MAKECMDGOALS))
 
 .oscheck:
-	$(V)cd bsp/oscheck && ./shellcheck && ./oscheck $(SCRIPT_DEBUG) && ./pkg -r $(SCRIPT_DEBUG)
+	$(V)cd bsp/oscheck && ./shellcheck && ./oscheck $(SCRIPT_DEBUG) && ./pkg -r $(SCRIPT_DEBUG) && ./osfix
 	$(V)touch .oscheck
 ifndef config-goals
   ifndef build-goals

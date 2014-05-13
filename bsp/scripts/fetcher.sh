@@ -300,8 +300,8 @@ function download {
     fi
 }
 
-#This function unpacks the package to the app's directory.
-function unpack {
+#This function processes the package based on its file extension
+function process_package {
 
     if [ ! -z "$FETCHER_EXTRACT_DIRECTORY_NAME" ] ; then
         DIRNAME=$FETCHER_EXTRACT_DIRECTORY_NAME
@@ -316,7 +316,7 @@ function unpack {
     fi
 
     pushd . >/dev/null
-    echo "    Unpacking $PKG_TARBALL... "
+    echo "    Processing $PKG_TARBALL... "
     cd $DIRNAME
     case $PKG_TARBALL in
         *.tar.gz | *.tgz)
@@ -348,6 +348,9 @@ function unpack {
                 $DOWNLOADPATH/$PKG_TARBALL $BIN_ARGUMENTS
             fi
             ;;
+	*.deb )
+	    dpkg-deb -x $DOWNLOADPATH/$PKG_TARBALL .
+	    ;;
         default )
             echo "Unknown package type, can't handle it"
             return 255
@@ -384,8 +387,8 @@ for url in "${URLS[@]}" ; do
     define_pkg_type
     #Try to download the package.
     if download $url ; then
-        #If the package was succesfully downloaded we unpack it.
-        result=eval unpack;
+        #Package was succesfully downloaded, process it
+        result=eval process_package;
         exit $result;
     fi;
 done

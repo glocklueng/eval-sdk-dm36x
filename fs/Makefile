@@ -116,6 +116,11 @@ depmod:
 		-v $(KERNELVERSION) $(QOUT); \
 	fi
 
+ldconfig:
+	$(V) touch $(FSROOT)/etc/ld.so.conf
+	$(V) mkdir -p $(FSROOT)/var/cache/ldconfig
+	bash -x $(LDCONFIG) -r $(FSROOT) $(QOUT)
+
 build: build_start $(FSROOT) $(FSDEVROOT) $(foreach COMP, $(FS_COMPONENTS), $(COMP)_build) networkconfig
 	$(V) $(ECHO) "Installing proprietary code"
 # Now let's link this stuff,
