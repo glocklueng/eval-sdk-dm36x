@@ -1,7 +1,16 @@
 Index: ti-flash-utils/src/DM36x/Common/src/device.c
 ===================================================================
---- ti-flash-utils.orig/src/DM36x/Common/src/device.c	2013-05-14 14:26:48.391184329 -0600
-+++ ti-flash-utils/src/DM36x/Common/src/device.c	2013-05-14 14:26:48.547176278 -0600
+--- ti-flash-utils.orig/src/DM36x/Common/src/device.c
++++ ti-flash-utils/src/DM36x/Common/src/device.c
+@@ -253,7 +253,7 @@
+ 
+ static const Uint16 DDR_T_RP = 150;
+ static const Uint16 DDR_T_RCD = 150;
+-static const Uint16 DDR_T_RC = 55;
++static const Uint16 DDR_T_RC = 550;
+ 
+ #define PLL1_MUL		0x55 
+ #define PLL1_PREDIV		0x5
 @@ -382,6 +382,7 @@
  Uint32 DEVICE_init()
  {
@@ -20,8 +29,8 @@ Index: ti-flash-utils/src/DM36x/Common/src/device.c
    if (status == E_PASS) status |= DEVICE_UART0Init();
 Index: ti-flash-utils/src/Common/ubl/src/nandboot.c
 ===================================================================
---- ti-flash-utils.orig/src/Common/ubl/src/nandboot.c	2013-05-14 14:24:23.874642280 -0600
-+++ ti-flash-utils/src/Common/ubl/src/nandboot.c	2013-05-14 14:27:06.562246267 -0600
+--- ti-flash-utils.orig/src/Common/ubl/src/nandboot.c
++++ ti-flash-utils/src/Common/ubl/src/nandboot.c
 @@ -173,6 +173,9 @@
      // application header in the NAND flash at the next block.
      if(readError != E_PASS) {
@@ -34,8 +43,8 @@ Index: ti-flash-utils/src/Common/ubl/src/nandboot.c
        }
 Index: ti-flash-utils/src/DM36x/Common/src/device_nand.c
 ===================================================================
---- ti-flash-utils.orig/src/DM36x/Common/src/device_nand.c	2013-05-14 14:24:23.914640215 -0600
-+++ ti-flash-utils/src/DM36x/Common/src/device_nand.c	2013-05-14 14:26:48.547176278 -0600
+--- ti-flash-utils.orig/src/DM36x/Common/src/device_nand.c
++++ ti-flash-utils/src/DM36x/Common/src/device_nand.c
 @@ -226,6 +226,18 @@
    Uint16 addOffset, corrValue;
    Uint16* syndrome10 = (Uint16 *)readECC;
