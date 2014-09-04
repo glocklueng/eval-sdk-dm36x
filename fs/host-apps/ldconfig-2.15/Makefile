@@ -36,8 +36,8 @@ $(error ====== DEVDIR variable is empty, invoke this Makefile from the BSP root,
 endif
 
 PKG_URL= http://security.ubuntu.com/ubuntu/pool/main/e/eglibc
-PKG_TARBALL=libc-bin_2.15-0ubuntu10.5_i386.deb
-PKG_SHA1SUM=eb069c399650563148b4f7a47ec80fa35e371696
+PKG_TARBALL=libc-bin_2.15-0ubuntu10.7_i386.deb
+PKG_SHA1SUM=eb214889010b0d2b1e85d1182d2394c68116f7ba
 
 LDCONF=$(DEVDIR)/bsp/local/bin/ldconfig.2_15
 export LDCONFIG=ldconfig.2_15
