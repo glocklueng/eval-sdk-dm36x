@@ -43,7 +43,7 @@ configured: patch
 
 CORRECT_PKGCONFIG_SED_EXPRESSION?=s?prefix=/usr?prefix=$(FSDEVROOT)/usr?g
 installed:
-	$(V)$(MAKE) -C $(ARCH) install INSTALL_PREFIX=$(FSDEVROOT) $(QOUT)
+	$(V)$(MAKE) -C $(ARCH) install_sw INSTALL_PREFIX=$(FSDEVROOT) $(QOUT)
 	$(V) for pc_file in $(CORRECT_PKGCONFIG) ; do \
 	    sed -i -e "$(CORRECT_PKGCONFIG_SED_EXPRESSION)" $(FSDEVROOT)/$$pc_file ; \
 	done
