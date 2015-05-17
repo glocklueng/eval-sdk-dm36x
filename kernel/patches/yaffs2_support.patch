@@ -1,8 +1,8 @@
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/Kconfig
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/Kconfig
 ===================================================================
---- kernel.orig/linux-2.6.32.17-psp03.01.01.39/fs/Kconfig	2011-03-24 18:27:35.000000000 -0600
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/Kconfig	2011-03-31 12:27:12.826395169 -0600
-@@ -174,6 +174,10 @@
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/fs/Kconfig	2014-11-11 08:58:04.000000000 -0700
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/Kconfig	2015-05-13 13:48:46.058307834 -0600
+@@ -176,6 +176,10 @@
  source "fs/befs/Kconfig"
  source "fs/bfs/Kconfig"
  source "fs/efs/Kconfig"
@@ -13,21 +13,19 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/Kconfig
  source "fs/jffs2/Kconfig"
  # UBIFS File system configuration
  source "fs/ubifs/Kconfig"
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/Makefile
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/Makefile
 ===================================================================
---- kernel.orig/linux-2.6.32.17-psp03.01.01.39/fs/Makefile	2011-03-24 18:27:35.000000000 -0600
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/Makefile	2011-03-31 12:27:12.826395169 -0600
-@@ -124,3 +124,6 @@
- obj-$(CONFIG_BTRFS_FS)		+= btrfs/
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/fs/Makefile	2014-11-11 08:58:04.000000000 -0700
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/Makefile	2015-05-13 13:49:30.596048945 -0600
+@@ -121,3 +121,4 @@
  obj-$(CONFIG_GFS2_FS)           += gfs2/
  obj-$(CONFIG_EXOFS_FS)          += exofs/
-+
-+# Patched by YAFFS
+ obj-$(CONFIG_CEPH_FS)		+= ceph/
 +obj-$(CONFIG_YAFFS_FS)		+= yaffs2/
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/Kconfig
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/Kconfig
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/Kconfig	2011-03-31 12:27:12.826395169 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/Kconfig	2015-05-13 13:48:46.058307834 -0600
 @@ -0,0 +1,190 @@
 +#
 +# YAFFS file system configurations
@@ -219,10 +217,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/Kconfig
 +	 If unsure, say Y.
 +
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/devextras.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/devextras.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/devextras.h	2011-03-31 12:27:12.826395169 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/devextras.h	2015-05-13 13:48:46.058307834 -0600
 @@ -0,0 +1,101 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -325,10 +323,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/devextras.h
 +
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/moduleconfig.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/moduleconfig.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/moduleconfig.h	2011-03-31 12:27:12.826395169 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/moduleconfig.h	2015-05-13 13:48:46.058307834 -0600
 @@ -0,0 +1,86 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -416,10 +414,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/moduleconfig.h
 +#endif /* YAFFS_OUT_OF_TREE */
 +
 +#endif /* __YAFFS_CONFIG_H__ */
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_allocator.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_allocator.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_allocator.c	2011-03-31 12:27:12.826395169 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_allocator.c	2015-05-13 13:48:46.058307834 -0600
 @@ -0,0 +1,408 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -829,10 +827,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_allocator.c
 +
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_allocator.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_allocator.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_allocator.h	2011-03-31 12:27:12.830395352 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_allocator.h	2015-05-13 13:48:46.058307834 -0600
 @@ -0,0 +1,30 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -864,10 +862,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_allocator.h
 +void yaffs_free_raw_obj(yaffs_dev_t *dev, yaffs_obj_t *obj);
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_bitmap.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_bitmap.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_bitmap.c	2011-03-31 12:27:12.830395352 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_bitmap.c	2015-05-13 13:48:46.058307834 -0600
 @@ -0,0 +1,105 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -974,10 +972,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_bitmap.c
 +	return n;
 +}
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_bitmap.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_bitmap.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_bitmap.h	2011-03-31 12:27:12.830395352 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_bitmap.h	2015-05-13 13:48:46.058307834 -0600
 @@ -0,0 +1,33 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -1012,10 +1010,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_bitmap.h
 +int yaffs_count_chunk_bits(yaffs_dev_t *dev, int blk);
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_checkptrw.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_checkptrw.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_checkptrw.c	2011-03-31 12:27:12.830395352 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_checkptrw.c	2015-05-13 13:48:46.062307631 -0600
 @@ -0,0 +1,400 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -1417,10 +1415,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_checkptrw.c
 +
 +
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_checkptrw.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_checkptrw.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_checkptrw.h	2011-03-31 12:27:12.830395352 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_checkptrw.h	2015-05-13 13:48:46.062307631 -0600
 @@ -0,0 +1,34 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -1456,10 +1454,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_checkptrw.h
 +
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_ecc.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_ecc.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_ecc.c	2011-03-31 12:27:12.830395352 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_ecc.c	2015-05-13 13:48:46.062307631 -0600
 @@ -0,0 +1,323 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -1784,10 +1782,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_ecc.c
 +
 +	return -1;
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_ecc.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_ecc.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_ecc.h	2011-03-31 12:27:12.830395352 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_ecc.h	2015-05-13 13:48:46.062307631 -0600
 @@ -0,0 +1,44 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -1833,10 +1831,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_ecc.h
 +			yaffs_ecc_other *read_ecc,
 +			const yaffs_ecc_other *test_ecc);
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_getblockinfo.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_getblockinfo.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_getblockinfo.h	2011-03-31 12:27:12.830395352 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_getblockinfo.h	2015-05-13 13:48:46.062307631 -0600
 @@ -0,0 +1,35 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -1873,10 +1871,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_getblockinfo.h
 +}
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_guts.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_guts.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_guts.c	2011-03-31 12:27:12.834395534 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_guts.c	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,5544 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -7422,10 +7420,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_guts.c
 +#endif
 +	return YAFFS_OK;
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_guts.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_guts.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_guts.h	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_guts.h	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,969 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -8396,10 +8394,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_guts.h
 +__u32 yaffs_get_group_base(yaffs_dev_t *dev, yaffs_tnode_t *tn, unsigned pos);
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_linux.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_linux.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_linux.h	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_linux.h	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,43 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -8444,10 +8442,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_linux.h
 +
 +#endif
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_linux_allocator.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_linux_allocator.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_linux_allocator.c	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_linux_allocator.c	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,202 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -8651,10 +8649,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_linux_allocator.c
 +	yaffs_Allocator *allocator = dev->allocator;
 +	kmem_cache_free(allocator->object_cache,obj);
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_list.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_list.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_list.h	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_list.h	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,127 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -8783,10 +8781,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_list.h
 +
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif.c	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif.c	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,56 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -8844,10 +8842,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif.c
 +	return YAFFS_OK;
 +}
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif.h	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif.h	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,27 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -8876,10 +8874,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif.h
 +int nandmtd_erase_block(yaffs_dev_t *dev, int block_no);
 +int nandmtd_initialise(yaffs_dev_t *dev);
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif1.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif1.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif1.c	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif1.c	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,362 @@
 +/*
 + * YAFFS: Yet another FFS. A NAND-flash specific file system.
@@ -9243,10 +9241,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif1.c
 +}
 +
 +#endif /*MTD_VERSION*/
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif1.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif1.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif1.h	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif1.h	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,28 @@
 +/*
 + * YAFFS: Yet another Flash File System. A NAND-flash specific file system.
@@ -9276,10 +9274,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif1.h
 +	yaffs_block_state_t *state, __u32 *seq_number);
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif2.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif2.c	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif2.c	2015-05-13 13:48:46.066307428 -0600
 @@ -0,0 +1,256 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -9537,10 +9535,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif2.c
 +		return YAFFS_FAIL;
 +}
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif2.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif2.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif2.h	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_mtdif2.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,29 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -9571,10 +9569,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_mtdif2.h
 +			yaffs_block_state_t *state, __u32 *seq_number);
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nameval.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_nameval.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nameval.c	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_nameval.c	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,197 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -9773,10 +9771,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nameval.c
 +{
 +	return nval_used(xb, xb_size) > 0;
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nameval.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_nameval.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nameval.h	2011-03-31 12:27:12.838395437 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_nameval.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,26 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -9804,10 +9802,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nameval.h
 +int nval_list(const char *xb, int xb_size, char *buf, int bsize);
 +int nval_hasvalues(const char *xb, int xb_size);
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nand.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_nand.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nand.c	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_nand.c	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,140 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -9949,10 +9947,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nand.c
 +
 +
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nand.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_nand.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nand.h	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_nand.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,44 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -9998,10 +9996,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_nand.h
 +
 +#endif
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags1.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_packedtags1.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags1.c	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_packedtags1.c	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,50 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -10053,10 +10051,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags1.c
 +		memset(t, 0, sizeof(yaffs_ext_tags));
 +	}
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags1.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_packedtags1.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags1.h	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_packedtags1.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,37 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -10095,10 +10093,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags1.h
 +void yaffs_pack_tags1(yaffs_packed_tags1 *pt, const yaffs_ext_tags *t);
 +void yaffs_unpack_tags1(yaffs_ext_tags *t, const yaffs_packed_tags1 *pt);
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags2.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_packedtags2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags2.c	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_packedtags2.c	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,198 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -10298,10 +10296,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags2.c
 +	yaffs_dump_tags2(t);
 +}
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags2.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_packedtags2.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags2.h	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_packedtags2.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,43 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -10346,10 +10344,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_packedtags2.h
 +void yaffs_pack_tags2_tags_only(yaffs_packed_tags2_tags_only *pt, const yaffs_ext_tags *t);
 +void yaffs_unpack_tags2_tags_only(yaffs_ext_tags *t, yaffs_packed_tags2_tags_only *pt);
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_qsort.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_qsort.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_qsort.h	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_qsort.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,34 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -10385,10 +10383,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_qsort.h
 +
 +#endif
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagscompat.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_tagscompat.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagscompat.c	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_tagscompat.c	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,539 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -10929,10 +10927,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagscompat.c
 +
 +	return YAFFS_OK;
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagscompat.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_tagscompat.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagscompat.h	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_tagscompat.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,39 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -10973,10 +10971,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagscompat.h
 +int yaffs_count_bits(__u8 byte);
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagsvalidity.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_tagsvalidity.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagsvalidity.c	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_tagsvalidity.c	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,28 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -11006,10 +11004,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagsvalidity.c
 +		tags->validty1 == 0x55555555);
 +
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagsvalidity.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_tagsvalidity.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagsvalidity.h	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_tagsvalidity.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,24 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -11035,10 +11033,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_tagsvalidity.h
 +void yaffs_init_tags(yaffs_ext_tags *tags);
 +int yaffs_validate_tags(yaffs_ext_tags *tags);
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_trace.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_trace.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_trace.h	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_trace.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,60 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -11100,10 +11098,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_trace.h
 +#define T(mask, p) do { if ((mask) & (yaffs_trace_mask | YAFFS_TRACE_ALWAYS)) TOUT(p); } while (0)
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_verify.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_verify.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_verify.c	2011-03-31 12:27:12.842395061 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_verify.c	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,631 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -11736,10 +11734,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_verify.c
 +	return YAFFS_OK;
 +#endif
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_verify.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_verify.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_verify.h	2011-03-31 12:27:12.846394685 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_verify.h	2015-05-13 13:48:46.070307225 -0600
 @@ -0,0 +1,41 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -11782,10 +11780,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_verify.h
 +
 +#endif
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_vfs_glue.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_vfs_glue.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_vfs_glue.c	2011-03-31 12:27:12.846394685 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_vfs_glue.c	2015-05-13 13:48:46.074307022 -0600
 @@ -0,0 +1,3583 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -15370,10 +15368,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_vfs_glue.c
 +MODULE_DESCRIPTION("YAFFS2 - a NAND specific flash file system");
 +MODULE_AUTHOR("Charles Manning, Aleph One Ltd., 2002-2010");
 +MODULE_LICENSE("GPL");
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs1.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_yaffs1.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs1.c	2011-03-31 12:27:12.850395147 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_yaffs1.c	2015-05-13 13:48:46.074307022 -0600
 @@ -0,0 +1,457 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -15832,10 +15830,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs1.c
 +	return YAFFS_OK;
 +}
 +
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs1.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_yaffs1.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs1.h	2011-03-31 12:27:12.850395147 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_yaffs1.h	2015-05-13 13:48:46.074307022 -0600
 @@ -0,0 +1,22 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -15859,10 +15857,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs1.h
 +int yaffs1_scan(yaffs_dev_t *dev);
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs2.c
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_yaffs2.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs2.c	2011-03-31 12:27:12.850395147 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_yaffs2.c	2015-05-13 13:48:46.074307022 -0600
 @@ -0,0 +1,1541 @@
 +/*
 + * YAFFS: Yet Another Flash File System. A NAND-flash specific file system.
@@ -17405,10 +17403,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs2.c
 +
 +	return YAFFS_OK;
 +}
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs2.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_yaffs2.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs2.h	2011-03-31 12:27:12.850395147 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yaffs_yaffs2.h	2015-05-13 13:48:46.074307022 -0600
 @@ -0,0 +1,38 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -17448,10 +17446,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yaffs_yaffs2.h
 +int yaffs2_scan_backwards(yaffs_dev_t *dev);
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yportenv.h
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yportenv.h
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yportenv.h	2011-03-31 12:27:12.850395147 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/yportenv.h	2015-05-13 13:48:46.074307022 -0600
 @@ -0,0 +1,337 @@
 +/*
 + * YAFFS: Yet another Flash File System . A NAND-flash specific file system.
@@ -17790,10 +17788,10 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/yportenv.h
 +
 +
 +#endif
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/Makefile
+Index: kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/Makefile
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/fs/yaffs2/Makefile	2011-03-31 12:27:12.850395147 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/fs/yaffs2/Makefile	2015-05-13 13:48:46.074307022 -0600
 @@ -0,0 +1,17 @@
 +#
 +# Makefile for the linux YAFFS filesystem routines.

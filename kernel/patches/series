@@ -1,8 +1,2 @@
 rrsdk_integration.patch
 yaffs2_support.patch
-ubi-2.6.40-backport.patch
-lttng-2.6.23.9-0.198.patch
-v4l2-events-interface-backport.patch
-add-uvc-gadget-driver.patch
-fix-v4l2-event-issue.patch
-tvp7002-add-queryctrl.patch

@@ -1,71 +1,7 @@
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/Makefile
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/net/tokenring/Kconfig
 ===================================================================
---- kernel.orig/linux-2.6.32.17-psp03.01.01.39/Makefile	2011-02-23 12:18:02.379855467 -0600
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/Makefile	2011-02-23 12:19:33.420305514 -0600
-@@ -1,7 +1,7 @@
- VERSION = 2
- PATCHLEVEL = 6
- SUBLEVEL = 32
--EXTRAVERSION = .17
-+EXTRAVERSION = -17-ridgerun
- NAME = Man-Eating Seals of Antiquity
- 
- # *DOCUMENTATION*
-@@ -17,7 +17,7 @@
- MAKEFLAGS += -rR --no-print-directory
- 
- # Add custom flags here to avoid conflict with updates
--EXTRAVERSION := $(EXTRAVERSION)-davinci1
-+EXTRAVERSION := $(EXTRAVERSION)
- 
- # We are using a recursive build, so we need to do a little thinking
- # to get the ordering right.
-@@ -941,7 +941,7 @@
- localver-full = $(localver)$(localver-auto)
- 
- # Store (new) KERNELRELASE string in include/config/kernel.release
--kernelrelease = $(KERNELVERSION)$(localver-full)
-+kernelrelease = $(KERNELVERSION)
- include/config/kernel.release: include/config/auto.conf FORCE
- 	$(Q)rm -f $@
- 	$(Q)echo $(kernelrelease) > $@
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/Kconfig
-===================================================================
---- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/Kconfig	2011-02-23 12:18:02.331854650 -0600
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/Kconfig	2011-02-23 12:18:22.600089271 -0600
-@@ -3,7 +3,7 @@
- # see Documentation/kbuild/kconfig-language.txt.
- #
- 
--mainmenu "Linux Kernel Configuration"
-+#mainmenu "Linux Kernel Configuration"
- 
- config ARM
- 	bool
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/memory.h
-===================================================================
---- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/memory.h	2011-02-23 12:18:02.343793534 -0600
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/memory.h	2011-02-23 12:18:22.600089271 -0600
-@@ -23,6 +23,7 @@
- #define DAVINCI_DDR_BASE	0x80000000
- #define DA8XX_DDR_BASE		0xc0000000
- 
-+
- #if defined(CONFIG_ARCH_DAVINCI_DA8XX) && defined(CONFIG_ARCH_DAVINCI_DMx)
- #error Cannot enable DaVinci and DA8XX platforms concurrently
- #elif defined(CONFIG_ARCH_DAVINCI_DA8XX)
-@@ -31,6 +32,7 @@
- #define PHYS_OFFSET DAVINCI_DDR_BASE
- #endif
- 
-+
- /*
-  * Increase size of DMA-consistent memory region
-  */
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/net/tokenring/Kconfig
-===================================================================
---- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/net/tokenring/Kconfig	2011-02-23 12:18:02.367850094 -0600
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/net/tokenring/Kconfig	2011-02-23 12:18:22.600089271 -0600
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/net/tokenring/Kconfig	2015-02-16 14:49:27.549028347 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/net/tokenring/Kconfig	2015-02-16 14:49:29.145028347 -0600
 @@ -3,7 +3,7 @@
  #
  
@@ -84,26 +20,100 @@ Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/net/tokenring/Kconfig
  
  config IBMTR
  	tristate "IBM Tropic chipset based adapter support"
-@@ -182,4 +182,4 @@
- 	  To compile this driver as a module, choose M here: the module will be
- 	  called smctr.
- 
--endif # TR
-+endif # KTR
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Kconfig
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/i2c/algos/Kconfig
 ===================================================================
---- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Kconfig	2011-02-23 12:18:02.351856527 -0600
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Kconfig	2011-02-23 12:18:22.600089271 -0600
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/i2c/algos/Kconfig	2015-02-16 14:49:27.617028347 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/i2c/algos/Kconfig	2015-02-16 14:49:29.145028347 -0600
+@@ -3,7 +3,7 @@
+ #
+ 
+ menu "I2C Algorithms"
+-	visible if !I2C_HELPER_AUTO
++	depends on !I2C_HELPER_AUTO
+ 
+ config I2C_ALGOBIT
+ 	tristate "I2C bit-banging interfaces"
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/common/tuners/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/common/tuners/Kconfig	2015-02-16 14:49:27.569028347 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/common/tuners/Kconfig	2015-02-16 14:49:29.145028347 -0600
+@@ -44,8 +44,7 @@
+ 
+ 	  If unsure say N.
+ 
+-menu "Customize TV tuners"
+-	visible if MEDIA_TUNER_CUSTOMISE
++if MEDIA_TUNER_CUSTOMISE
+ 
+ config MEDIA_TUNER_SIMPLE
+ 	tristate "Simple tuner support"
+@@ -186,4 +185,5 @@
+ 	default m if MEDIA_TUNER_CUSTOMISE
+ 	help
+ 	  NXP TDA18218 silicon tuner driver.
+-endmenu
++
++endif # MEDIA_TUNER_CUSTOMISE
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig	2015-02-16 14:49:27.557028347 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig	2015-02-16 15:15:31.293028161 -0600
+@@ -112,7 +112,7 @@
+ #
+ 
+ menu "Encoders/decoders and other helper chips"
+-	visible if !VIDEO_HELPER_CHIPS_AUTO
++	depends on !VIDEO_HELPER_CHIPS_AUTO
+ 
+ comment "Audio decoders"
+ 
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/dvb/frontends/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/dvb/frontends/Kconfig	2015-02-16 14:49:27.585028347 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/dvb/frontends/Kconfig	2015-02-16 14:49:29.145028347 -0600
+@@ -13,7 +13,6 @@
+ 	  If unsure say N.
+ 
+ menu "Customise DVB Frontends"
+-	visible if DVB_FE_CUSTOMISE
+ 
+ comment "Multistandard (satellite) frontends"
+ 	depends on DVB_CORE
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/staging/echo/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/staging/echo/Kconfig	2015-02-16 14:49:27.593028347 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/staging/echo/Kconfig	2015-02-16 14:49:29.145028347 -0600
 @@ -1,4 +1,4 @@
 -config ECHO
 +config KECHO
  	tristate "Line Echo Canceller support"
  	default n
  	---help---
-Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Makefile
+Index: kernel/linux-2.6.37-psp03.21.00.04/Makefile
 ===================================================================
---- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Makefile	2011-02-23 12:18:02.359856104 -0600
-+++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Makefile	2011-02-23 12:18:22.600089271 -0600
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/Makefile	2015-02-16 14:49:27.629028347 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/Makefile	2015-02-16 15:21:21.429028119 -0600
+@@ -1,7 +1,7 @@
+ VERSION = 2
+ PATCHLEVEL = 6
+ SUBLEVEL = 37
+-EXTRAVERSION =
++EXTRAVERSION = -17-ridgerun
+ NAME = Flesh-Eating Bats with Fangs
+ 
+ # *DOCUMENTATION*
+@@ -569,6 +569,7 @@
+ 
+ ifdef CONFIG_DEBUG_INFO
+ KBUILD_CFLAGS	+= -g
++#KBUILD_CFLAGS	+= -ggdb3
+ KBUILD_AFLAGS	+= -gdwarf-2
+ endif
+ 
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/staging/echo/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/staging/echo/Makefile	2015-02-16 14:49:27.605028347 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/staging/echo/Makefile	2015-02-16 14:49:29.145028347 -0600
 @@ -1 +1 @@
 -obj-$(CONFIG_ECHO) += echo.o
 +obj-$(CONFIG_KECHO) += echo.o

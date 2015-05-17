@@ -1,0 +1,95 @@
+Index: kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/dm365.c
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/dm365.c	2014-11-11 08:57:51.000000000 -0700
++++ kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/dm365.c	2015-05-11 10:59:40.508591561 -0600
+@@ -574,15 +574,37 @@
+ MUX_CFG(DM365,	CLKOUT0,	4,   20,    3,    3,     false)
+ MUX_CFG(DM365,	CLKOUT1,	4,   16,    3,    3,     false)
+ MUX_CFG(DM365,	CLKOUT2,	4,   8,     3,    3,     false)
++MUX_CFG(DM365,	EXTCLK,		1,   20,    3,    1,	 false)
+ 
+ MUX_CFG(DM365,	GPIO20,		3,   21,    3,    0,	 false)
+ MUX_CFG(DM365,	GPIO30,		4,   6,     3,	  0,	 false)
+ MUX_CFG(DM365,	GPIO31,		4,   8,     3,	  0,	 false)
+ MUX_CFG(DM365,	GPIO32,		4,   10,    3,	  0,	 false)
+ MUX_CFG(DM365,	GPIO33,		4,   12,    3,	  0,	 false)
++MUX_CFG(DM365,	GPIO34,		4,   14,    3,    0,	 false)
++MUX_CFG(DM365,	GPIO35,		4,   16,    3,    0,	 false)
++MUX_CFG(DM365,	GPIO36,		4,   18,    3,    0,	 false)
++MUX_CFG(DM365,	GPIO37,		4,   20,    3,    0,	 false)
+ MUX_CFG(DM365,	GPIO40,		4,   26,    3,	  0,	 false)
+ MUX_CFG(DM365,	GPIO64_57,	2,   6,     1,	  0,	 false)
++MUX_CFG(DM365,	GPIO66,		2,   0,     3,	  0,	 false)
++MUX_CFG(DM365,	GPIO78_65ex72_70_68,	2,    0,    3,    0,	 false)
++MUX_CFG(DM365,	GPIO80,		1,   20,    3,	  1,	 false)
++MUX_CFG(DM365,	GPIO82,		1,   17,    1,    1,     false)
++MUX_CFG(DM365,  GPIO98,         0,   9,     1,    1,     false)
++MUX_CFG(DM365,  GPIO99,         0,   8,     1,    1,     false)
++MUX_CFG(DM365,	VCLK,		1,   22,    1,    0,     false)
+ 
++MUX_CFG(DM365,  VOUT_B0,        4,   0,     3,    3,     false)
++MUX_CFG(DM365,  VOUT_B1,        4,   2,     3,    3,     false)
++MUX_CFG(DM365,  VOUT_B2,        1,   20,    3,    2,     false)
++MUX_CFG(DM365,  VOUT_G0,        4,   4,     3,    3,     false)
++MUX_CFG(DM365,  VOUT_G1,        4,   6,     3,    3,     false)
++MUX_CFG(DM365,  VOUT_R0,        4,   10,    3,    3,     false)
++MUX_CFG(DM365,  VOUT_R1,        4,   12,    3,    3,     false)
++MUX_CFG(DM365,  VOUT_R2,        1,   18,    3,    2,     false)
++
++MUX_CFG(DM365,  VOUT_LCD_OE,    1,   17,    1,    0,     false)
+ MUX_CFG(DM365,	VOUT_FIELD,	1,   18,    3,	  1,	 false)
+ MUX_CFG(DM365,	VOUT_FIELD_G81,	1,   18,    3,	  0,	 false)
+ MUX_CFG(DM365,	VOUT_HVSYNC,	1,   16,    1,	  0,	 false)
+Index: kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/include/mach/mux.h
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/include/mach/mux.h	2014-11-11 08:57:51.000000000 -0700
++++ kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/include/mach/mux.h	2015-05-11 11:00:14.698848567 -0600
+@@ -294,17 +294,40 @@
+ 	DM365_CLKOUT0,
+ 	DM365_CLKOUT1,
+ 	DM365_CLKOUT2,
++	DM365_EXTCLK,
+ 
+ 	/* GPIO */
+ 	DM365_GPIO20,
+ 	DM365_GPIO30,
+ 	DM365_GPIO31,
+ 	DM365_GPIO32,
++
+ 	DM365_GPIO33,
++	DM365_GPIO34,
++	DM365_GPIO35,
++	DM365_GPIO36,
++	DM365_GPIO37,
+ 	DM365_GPIO40,
+ 	DM365_GPIO64_57,
++	DM365_GPIO66,
++	DM365_GPIO78_65ex72_70_68,
++	DM365_GPIO80,
++	DM365_GPIO82,
++	DM365_GPIO98,
++	DM365_GPIO99,
++	DM365_VCLK,
+ 
+ 	/* Video */
++	DM365_VOUT_B0,
++	DM365_VOUT_B1,
++	DM365_VOUT_B2,
++	DM365_VOUT_G0,
++	DM365_VOUT_G1,
++	DM365_VOUT_R0,
++	DM365_VOUT_R1,
++	DM365_VOUT_R2,
++
++	DM365_VOUT_LCD_OE,
+ 	DM365_VOUT_FIELD,
+ 	DM365_VOUT_FIELD_G81,
+ 	DM365_VOUT_HVSYNC,
+@@ -341,7 +364,6 @@
+ 	DM365_EVT3_ASP_RX,
+ 	DM365_EVT2_VC_TX,
+ 	DM365_EVT3_VC_RX,
+-	DM365_EVT26_MMC0_RX,
+ };
+ 
+ enum da830_index {

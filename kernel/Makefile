@@ -2,6 +2,8 @@
 # Copyright (C) 2010 Ridgerun (http://www.ridgerun.com). 
 ##$L$
 
+export USE_KERNEL_TOOLCHAIN=y
+
 include ../bsp/classes/rrsdk.class
 include $(CLASSES)/fetcher.defs
 include $(CLASSES)/flags.defs
@@ -15,7 +17,7 @@ build: real_build modules_install headers_install
 real_build: $(KERNEL) preconfig patch
 	$(V) ln -sf $(DEVDIR)/bsp/mach/bspconfig $(KERNEL)/.config
 	$(V) cat /dev/zero | $(MAKE) -C $(KERNEL) $(KFLAGS) oldconfig $(QOUT) 2>/dev/null
-	$(V) $(MAKE) -C $(KERNEL) $(KFLAGS)
+	$(V) $(MAKE) -j $(BSP_NCPU) -C $(KERNEL) $(KFLAGS)
 	$(ARCH_KERNEL_RULES)
 ifeq ($(CONFIG_BSP_ARCH_KERNEL_COMPRESS),y)
 	$(Q)cp $(KERNEL)/arch/$(ARCH)/boot/zImage $(DEVDIR)/images/vmlinuz
@@ -43,7 +45,7 @@ patch: $(KERNEL) rrpreconfig
 	$(V)$(MAKE) rrpatched
 
 ifneq (x$(KERNEL_TARBALL),x)
-KERNEL_URL?=https://$(DOWNLOAD_SERVER)
+KERNEL_URL?=$(DOWNLOAD_SERVER)
 endif
 
 ifneq (x$(KERNEL_URL),x)
@@ -64,7 +66,8 @@ buildfs: modules_install
 headers_install: $(KERNEL)
 	$(V) $(MAKE) -C $(DEVDIR)/fs $(FSDEVROOT) $(QOUT)
 	$(V) $(MAKE) -C $(KERNEL) $@ $(KFLAGS) $(QOUT)
-	$(V) cp -R $(KERNEL)/usr/include/* $(FSDEVROOT)/usr/include
+	$(V) mkdir -p $(KERNEL_INCLUDE)
+	$(V) cp -R $(KERNEL)/usr/include/* $(KERNEL_INCLUDE)
 
 modules_install: $(KERNEL)
 	$(V) if [ -d $(FSROOT) ] ; then \
@@ -84,7 +87,7 @@ soft_clean: unpatch
 
 clean: unpatch
 	$(V) if ! [ -d $(KERNEL)/.svn ] ; then \
-	    rm -Rf $(KERNEL) rrfetched src rrpreconfig ; \
+	    rm -Rf $(KERNEL) rrfetched src rrpreconfig rrbuilt ; \
 	else \
 	    if [ -d $(KERNEL) ] ; then \
 		$(MAKE) -C $(KERNEL) $(KFLAGS) distclean ; \
