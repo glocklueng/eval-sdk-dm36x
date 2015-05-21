@@ -1,2 +1,3 @@
 rrsdk_integration.patch
 yaffs2_support.patch
+export-vm-functions.patch

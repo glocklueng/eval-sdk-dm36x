@@ -1,0 +1,40 @@
+Index: kernel/linux-2.6.37-psp03.21.00.04/mm/vmalloc.c
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/mm/vmalloc.c	2014-11-11 08:58:07.000000000 -0700
++++ kernel/linux-2.6.37-psp03.21.00.04/mm/vmalloc.c	2015-05-21 08:44:28.283957163 -0600
+@@ -1176,6 +1176,8 @@
+ 	vunmap_page_range(addr, addr + size);
+ }
+ 
++EXPORT_SYMBOL_GPL(unmap_kernel_range_noflush);
++
+ /**
+  * unmap_kernel_range - unmap kernel VM area and flush cache and TLB
+  * @addr: start of the VM area to unmap
+@@ -1193,6 +1195,8 @@
+ 	flush_tlb_kernel_range(addr, end);
+ }
+ 
++EXPORT_SYMBOL_GPL(unmap_kernel_range);
++
+ int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
+ {
+ 	unsigned long addr = (unsigned long)area->addr;
+Index: kernel/linux-2.6.37-psp03.21.00.04/lib/ioremap.c
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/lib/ioremap.c	2014-11-11 08:58:07.000000000 -0700
++++ kernel/linux-2.6.37-psp03.21.00.04/lib/ioremap.c	2015-05-21 08:50:59.352134474 -0600
+@@ -9,6 +9,7 @@
+ #include <linux/mm.h>
+ #include <linux/sched.h>
+ #include <linux/io.h>
++#include <linux/module.h>
+ #include <asm/cacheflush.h>
+ #include <asm/pgtable.h>
+ 
+@@ -90,3 +91,5 @@
+ 
+ 	return err;
+ }
++
++EXPORT_SYMBOL_GPL(ioremap_page_range);
