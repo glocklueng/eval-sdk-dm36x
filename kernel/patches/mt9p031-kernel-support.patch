@@ -1,0 +1,167 @@
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/video/Makefile	2014-11-11 09:57:55.000000000 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Makefile	2015-05-21 14:39:39.094667132 -0600
+@@ -77,6 +77,7 @@
+ obj-$(CONFIG_SOC_CAMERA_MT9M001)	+= mt9m001.o
+ obj-$(CONFIG_SOC_CAMERA_MT9M111)	+= mt9m111.o
+ obj-$(CONFIG_SOC_CAMERA_MT9T031)	+= mt9t031.o
++obj-$(CONFIG_SOC_CAMERA_MT9P031)	+= mt9p031.o
+ obj-$(CONFIG_SOC_CAMERA_MT9T112)	+= mt9t112.o
+ obj-$(CONFIG_SOC_CAMERA_MT9V022)	+= mt9v022.o
+ obj-$(CONFIG_SOC_CAMERA_OV6650)		+= ov6650.o
+Index: kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leopard.c
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leopard.c	2015-05-21 14:39:39.054667132 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leopard.c	2015-05-21 14:43:33.430665403 -0600
+@@ -208,13 +208,12 @@
+ #endif
+ #if defined(CONFIG_SOC_CAMERA_MT9P031) || defined(CONFIG_SOC_CAMERA_MT9P031_MODULE)
+ 	{
+-		.module_name = "mt9p031",
+-		.is_camera = 1,
+-		.grp_id = VPFE_SUBDEV_MT9P031,
++		.name = "mt9p031",
++		.grp_id = 4,
+ 		.num_inputs = ARRAY_SIZE(mt9p031_inputs),
+ 		.inputs = mt9p031_inputs,
+ 		.ccdc_if_params = {
+-			.if_type = V4L2_MBUS_FMT_SBGGR10_1X10,
++			.if_type = VPFE_RAW_BAYER,
+ 			.hdpol = VPFE_PINPOL_POSITIVE,
+ 			.vdpol = VPFE_PINPOL_POSITIVE,
+ 		},
+@@ -231,6 +230,7 @@
+        .num_subdevs = ARRAY_SIZE(vpfe_sub_devs),
+        .sub_devs = vpfe_sub_devs,
+        .card_name = "DM368 Leopard",
++       .ccdc = "DM365 ISIF",
+ };
+ 
+ static struct davinci_mmc_config dm368leopard_mmc_config = {
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig	2015-05-21 14:39:39.066667132 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig	2015-05-21 14:47:41.234663575 -0600
+@@ -550,9 +550,106 @@
+ 	  Say Y here if you want to test video apps or debug V4L devices.
+ 	  In doubt, say N.
+ 
+-source "drivers/media/video/davinci/Kconfig"
++config VIDEO_VPSS_SYSTEM
++	tristate "VPSS System module driver"
++	depends on ARCH_DAVINCI
++	help
++	  Support for vpss system module for video driver
++	default y
++
++config VIDEO_VPFE_CAPTURE
++	tristate "VPFE Video Capture Driver"
++	depends on VIDEO_V4L2 && ARCH_DAVINCI
++	select VIDEOBUF_DMA_CONTIG
++	help
++	  Support for DMXXXX VPFE based frame grabber. This is the
++	  common V4L2 module for following DMXXX SoCs from Texas
++	  Instruments:- DM6446 & DM355.
+ 
+-source "drivers/media/video/omap/Kconfig"
++	  To compile this driver as a module, choose M here: the
++	  module will be called vpfe-capture.
++
++config VIDEO_DM6446_CCDC
++	tristate "DM6446 CCDC HW module"
++	depends on ARCH_DAVINCI_DM644x && VIDEO_VPFE_CAPTURE
++	select VIDEO_VPSS_SYSTEM
++	default y
++	help
++	   Enables DaVinci CCD hw module. DaVinci CCDC hw interfaces
++	   with decoder modules such as TVP5146 over BT656 or
++	   sensor module such as MT9T001 over a raw interface. This
++	   module configures the interface and CCDC/ISIF to do
++	   video frame capture from slave decoders.
++
++	   To compile this driver as a module, choose M here: the
++	   module will be called vpfe.
++
++config VIDEO_DM355_CCDC
++	tristate "DM355 CCDC HW module"
++	depends on ARCH_DAVINCI_DM355 && VIDEO_VPFE_CAPTURE
++	select VIDEO_VPSS_SYSTEM
++	select MFD_DM355EVM_MSP
++	default y
++	help
++	   Enables DM355 CCD hw module. DM355 CCDC hw interfaces
++	   with decoder modules such as TVP5146 over BT656 or
++	   sensor module such as MT9T001 over a raw interface. This
++	   module configures the interface and CCDC/ISIF to do
++	   video frame capture from a slave decoders. MFD_DM355EVM_MSP
++	   is enabled to select input to CCDC at run time.
++
++	   To compile this driver as a module, choose M here: the
++	   module will be called vpfe.
++
++config VIDEO_DM365_ISIF
++	tristate "DM365 CCDC/ISIF HW module"
++	depends on ARCH_DAVINCI_DM365 && VIDEO_VPFE_CAPTURE
++	default y
++	help
++	   Enables DM365 ISIF hw module. This is the hardware module for
++	   configuring ISIF in VPFE to capture Raw Bayer RGB data  from
++	   a image sensor or YUV data from a YUV source.
++
++config VIDEO_DM355_AF
++	tristate "DM355 Auto Focus Driver"
++	depends on ARCH_DAVINCI_DM355
++	default y
++	help
++	  DM355 Auto Focus Driver. Auto Focus driver is used to support
++	  control loop for Auto Focus. It collects metrics about the image or
++	  video data
++
++config VIDEO_DM355_AEW
++	tristate "DM355 Auto exposure /White Balance Driver"
++	depends on ARCH_DAVINCI_DM355
++	help
++	  DM355 Auto Exposure and Auto White Balance driver is used to support
++	  the control loops for Auto Exposure and Auto White Balance. It collects
++	  metrics about the image or video data
++
++config VIDEO_DM365_3A_HW
++	tristate "DM365 Auto Focus, Auto Exposure/ White Balance HW module"
++	depends on ARCH_DAVINCI_DM365
++	help
++	  DM365 Auto Focus, Auto Exposure and Auto White Balancing HW module
++
++config VIDEO_DM365_AF
++	tristate "DM365 Auto Focus Driver"
++	depends on ARCH_DAVINCI_DM365
++	select VIDEO_DM365_3A_HW
++	help
++	  DM365 Auto Focus Driver. Auto Focus driver is used to support
++	  control loop for Auto Focus. It collects metrics about the image or
++	  video data
++
++config VIDEO_DM365_AEW
++	tristate "DM365 Auto exposure /White Balance Driver"
++	depends on ARCH_DAVINCI_DM365
++	select VIDEO_DM365_3A_HW
++	help
++	  DM365 Auto Exposure and Auto White Balance driver is used to support
++	  the control loops for Auto Exposure and Auto White Balance. It collects
++	  metrics about the image or video data
+ 
+ source "drivers/media/video/bt8xx/Kconfig"
+ 
+@@ -764,6 +861,12 @@
+ 	help
+ 	  This driver supports MT9T112 cameras from Aptina.
+ 
++config SOC_CAMERA_MT9P031
++	tristate "mt9p031 support"
++	depends on SOC_CAMERA && I2C
++	help
++	  This driver supports MT9P031 cameras from Micron.
++
+ config SOC_CAMERA_MT9V022
+ 	tristate "mt9v022 support"
+ 	depends on SOC_CAMERA && I2C
