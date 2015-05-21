@@ -1,0 +1,12 @@
+config FS_APPS_CMEM
+	bool "Contiguous memory allocator kernel driver"
+	default n
+	help
+		CMEM is an API (Reference Guide) and library for managing one or more blocks
+		of physically contiguous memory. It also provides address translation services
+		(e.g. virtual to physical translation) and user-mode cache management APIs.
+		This physically contiguous memory is useful as data buffers that will be shared
+		with another processor (e.g. DSP) or a hardware accelerator/DMA.  Using its
+		pool-based configuration, CMEM enables users to avoid memory fragmentation,
+		and ensures large physically contiguous memory blocks are available even after
+		a system has been running for very long periods of time.

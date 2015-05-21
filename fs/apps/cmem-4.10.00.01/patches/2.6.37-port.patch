@@ -1,0 +1,32 @@
+Index: cmem-4.10.00.01/src/src/cmem/module/cmemk.c
+===================================================================
+--- cmem-4.10.00.01.orig/src/src/cmem/module/cmemk.c	2015-05-21 09:03:47.601191207 -0600
++++ cmem-4.10.00.01/src/src/cmem/module/cmemk.c	2015-05-21 09:04:39.426557850 -0600
+@@ -18,7 +18,9 @@
+  */
+ #include <linux/device.h>
+ #include <linux/dma-mapping.h>
++#ifdef CONFIG_DMA_CONTIGUOUS
+ #include <linux/dma-contiguous.h>
++#endif
+ #include <linux/fs.h>
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+@@ -1195,7 +1197,7 @@
+ 	    if (bi == NBLOCKS) {
+ 		virtp = dma_alloc_coherent(dev, size, &dma, GFP_KERNEL);
+ 
+-#if IS_ENABLED(CONFIG_ARCH_KEYSTONE) && IS_ENABLED(CONFIG_ARM_LPAE)
++#if defined(CONFIG_ARCH_KEYSTONE) && defined(CONFIG_ARM_LPAE)
+ 		/* adjust from 32-bit alias to 36-bit phys */
+ 		physp = dma + 0x780000000ULL;
+ #else
+@@ -2593,7 +2595,7 @@
+ 
+ #if !defined(MULTI_CACHE)
+ 
+-#warning "MULTI_CACHE is *not* #defined, using work-around for asm cache functions"
++/* "MULTI_CACHE is *not* #defined, using work-around for asm cache functions" */
+ 
+ #ifdef CONFIG_CPU_ARM926T
+ 
