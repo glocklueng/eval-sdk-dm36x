@@ -1,7 +1,7 @@
 Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Makefile
 ===================================================================
 --- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/video/Makefile	2014-11-11 09:57:55.000000000 -0600
-+++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Makefile	2015-05-21 15:27:12.410646082 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Makefile	2015-06-01 13:52:17.897073977 -0600
 @@ -77,6 +77,7 @@
  obj-$(CONFIG_SOC_CAMERA_MT9M001)	+= mt9m001.o
  obj-$(CONFIG_SOC_CAMERA_MT9M111)	+= mt9m111.o
@@ -12,9 +12,9 @@ Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Makefile
  obj-$(CONFIG_SOC_CAMERA_OV6650)		+= ov6650.o
 Index: kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leopard.c
 ===================================================================
---- kernel.orig/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leopard.c	2015-05-21 15:27:12.374646082 -0600
-+++ kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leopard.c	2015-05-21 15:27:12.410646082 -0600
-@@ -208,13 +208,12 @@
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leopard.c	2015-06-01 13:52:17.841073977 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leopard.c	2015-06-01 14:17:47.797062690 -0600
+@@ -208,13 +208,13 @@
  #endif
  #if defined(CONFIG_SOC_CAMERA_MT9P031) || defined(CONFIG_SOC_CAMERA_MT9P031_MODULE)
  	{
@@ -22,6 +22,7 @@ Index: kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leop
 -		.is_camera = 1,
 -		.grp_id = VPFE_SUBDEV_MT9P031,
 +		.name = "mt9p031",
++        .is_camera = 1,
 +		.grp_id = 4,
  		.num_inputs = ARRAY_SIZE(mt9p031_inputs),
  		.inputs = mt9p031_inputs,
@@ -31,7 +32,7 @@ Index: kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leop
  			.hdpol = VPFE_PINPOL_POSITIVE,
  			.vdpol = VPFE_PINPOL_POSITIVE,
  		},
-@@ -231,6 +230,7 @@
+@@ -231,6 +231,7 @@
         .num_subdevs = ARRAY_SIZE(vpfe_sub_devs),
         .sub_devs = vpfe_sub_devs,
         .card_name = "DM368 Leopard",
@@ -41,8 +42,8 @@ Index: kernel/linux-2.6.37-psp03.21.00.04/arch/arm/mach-davinci/board-dm368-leop
  static struct davinci_mmc_config dm368leopard_mmc_config = {
 Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig
 ===================================================================
---- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig	2015-05-21 15:27:12.382646082 -0600
-+++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig	2015-05-21 15:27:12.410646082 -0600
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig	2015-06-01 13:52:17.865073977 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig	2015-06-01 13:52:17.897073977 -0600
 @@ -550,9 +550,106 @@
  	  Say Y here if you want to test video apps or debug V4L devices.
  	  In doubt, say N.
@@ -168,7 +169,7 @@ Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/Kconfig
 Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/mt9p031.c
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/mt9p031.c	2015-05-21 15:34:07.334643020 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/mt9p031.c	2015-06-01 13:52:17.897073977 -0600
 @@ -0,0 +1,1378 @@
 +/*
 + * Driver for MT9P031 CMOS Image Sensor from Micron
@@ -1548,3 +1549,71 @@ Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/mt9p031.c
 +MODULE_DESCRIPTION("Micron MT9P031 Camera driver");
 +MODULE_AUTHOR("Miguel Aguilar <miguel.aguilar@ridgerun.com>");
 +MODULE_LICENSE("GPL");
+Index: kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/davinci/vpfe_capture.c
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/drivers/media/video/davinci/vpfe_capture.c	2014-11-11 09:57:55.000000000 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/drivers/media/video/davinci/vpfe_capture.c	2015-06-01 14:09:32.589066343 -0600
+@@ -331,10 +331,20 @@
+ static int vpfe_config_ccdc_image_format(struct vpfe_device *vpfe_dev)
+ {
+ 	enum ccdc_frmfmt frm_fmt = CCDC_FRMFMT_INTERLACED;
++	u32 pix_fmt;
+ 	int ret = 0;
+ 
+-	if (ccdc_dev->hw_ops.set_pixel_format(
+-			vpfe_dev->fmt.fmt.pix.pixelformat) < 0) {
++	pix_fmt = vpfe_dev->fmt.fmt.pix.pixelformat;
++
++	/* At CCDC we need to set pix format based on source. */
++	if (vpfe_dev->imp_chained) {
++		if (vpfe_dev->current_subdev->is_camera)
++			pix_fmt = V4L2_PIX_FMT_SBGGR16;
++		else if (pix_fmt == V4L2_PIX_FMT_NV12)
++			pix_fmt = V4L2_PIX_FMT_UYVY;
++	}
++
++	if (ccdc_dev->hw_ops.set_pixel_format(pix_fmt) < 0) {
+ 		v4l2_err(&vpfe_dev->v4l2_dev,
+ 			"couldn't set pix format in ccdc\n");
+ 		return -EINVAL;
+@@ -1966,7 +1976,7 @@
+ 	platform_set_drvdata(pdev, vpfe_dev);
+ 	/* set driver private data */
+ 	video_set_drvdata(vpfe_dev->video_dev, vpfe_dev);
+-	i2c_adap = i2c_get_adapter(vpfe_cfg->i2c_adapter_id);
++	i2c_adap = i2c_get_adapter(1);
+ 	num_subdevs = vpfe_cfg->num_subdevs;
+ 	vpfe_dev->sd = kmalloc(sizeof(struct v4l2_subdev *) * num_subdevs,
+ 				GFP_KERNEL);
+Index: kernel/linux-2.6.37-psp03.21.00.04/include/media/davinci/vpfe_capture.h
+===================================================================
+--- kernel.orig/linux-2.6.37-psp03.21.00.04/include/media/davinci/vpfe_capture.h	2014-11-11 09:58:07.000000000 -0600
++++ kernel/linux-2.6.37-psp03.21.00.04/include/media/davinci/vpfe_capture.h	2015-06-01 14:14:51.933063987 -0600
+@@ -72,12 +72,16 @@
+ 	struct v4l2_input *inputs;
+ 	/* Sub dev routing information for each input */
+ 	struct vpfe_route *routes;
+-	/* check if sub dev supports routing */
+-	int can_route;
+ 	/* ccdc bus/interface configuration */
+ 	struct vpfe_hw_if_param ccdc_if_params;
+ 	/* i2c subdevice board info */
+ 	struct i2c_board_info board_info;
++	/* Is this a camera sub device ? */
++	unsigned is_camera:1;
++	/* check if sub dev supports routing */
++	unsigned can_route:1;
++	/* registered ? */
++	unsigned registered:1;
+ };
+ 
+ struct vpfe_config {
+@@ -120,6 +124,8 @@
+ 	u8 initialized;
+ 	/* current interface type */
+ 	struct vpfe_hw_if_param vpfe_if_params;
++	/* TODO for MC. Previewer is always present if IMP is chained */
++	unsigned char imp_chained;
+ 	/* ptr to currently selected sub device */
+ 	struct vpfe_subdev_info *current_subdev;
+ 	/* current input at the sub device */

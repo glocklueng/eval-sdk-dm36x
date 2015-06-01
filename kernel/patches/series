@@ -1,3 +1,4 @@
 rrsdk_integration.patch
 yaffs2_support.patch
 mt9p031-kernel-support.patch
+ccdc-basic-support.patch
