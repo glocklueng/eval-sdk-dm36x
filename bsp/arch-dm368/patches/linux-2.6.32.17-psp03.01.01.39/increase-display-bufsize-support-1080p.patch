@@ -1,0 +1,30 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_display.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_display.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_display.c
+@@ -51,7 +51,7 @@
+ static u32 cont3_bufoffset = 0;
+ static u32 cont3_bufsize = 0;
+ 
+-#define DAVINCI_DISPLAY_HD_BUF_SIZE (1280*720*2)
++#define DAVINCI_DISPLAY_HD_BUF_SIZE (1920*1080*2)
+ #define DAVINCI_DISPLAY_SD_BUF_SIZE (720*576*2)
+ 
+ static u32 video2_bufsize = DAVINCI_DISPLAY_HD_BUF_SIZE;
+@@ -1508,6 +1508,7 @@
+ 		return -EFAULT;
+ 	}
+ 
++#ifdef V4L2_INFO
+ 		dev_notice(davinci_display_dev,
+ 				"Before finishing with S_FMT:\n"
+ 				"layer.pix_fmt.bytesperline = %d,\n"
+@@ -1525,6 +1526,8 @@
+ 				"= %d\n",
+ 				pixfmt->width,
+ 				layer->layer_info.config.line_length);
++
++#endif
+ 
+ 		mutex_unlock(&davinci_dm.lock);
+ 	} else {

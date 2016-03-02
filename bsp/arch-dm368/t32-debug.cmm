@@ -1,0 +1,78 @@
+; Define here the location of your development directory (this is macro)
+&KERNELDIR="kernel/linux-2.6.22.2"
+&DEVDIR="./"
+&T32DIR="/opt"
+&KERNELENTRY=0x80008000
+
+; Setting up 
+print "Setting up hardware..."
+screen.on
+reset
+system.down
+task.reset
+break.delete
+map.reset
+mmu.reset
+symbol.reset
+system.reset
+
+system.cpu arm926ej
+system.jtagclock rtck
+SYStem.Option DACR ON          ; give Debugger global write permissions
+SYStem.Option ResBreak OFF     ; hardware dependent (see manual)
+SYStem.Option WaitReset ON     ; hardware dependent (see manual)
+system.multicore.irpost 6
+system.multicore.drpost 1
+system.multicore.irpre 4
+system.multicore.drpre 1
+;system.multicore.etbirpre 10
+;system.multicore.etbdrpre 2
+TrOnchip.Set DABORT OFF        ; used by Linux for page miss!
+TrOnchip.Set PABORT OFF        ; used by Linux for page miss!
+TrOnchip.Set UNDEF OFF         ; my be used by Linux for FPU detection
+setup.imaskasm ON
+setup.imaskhll off
+BREAK.SEL.PROGRAM ONCHIP 
+SYStem.Option MMU ON           ; enable space ids to virtual addresses
+
+print "Waiting for the kernel to start from bootloader" 
+sys.mode.attach
+break
+go &KERNELENTRY /onchip
+wait !run()
+
+print "Loading kernel symbols..."
+data.load.elf &KERNELDIR/vmlinux /nocode /gnu
+; Prevent empty structure definitions to confuse the debugger
+symbol.cleanup
+
+; Run over MMU & Interrupt initialization
+Go run_init_process /Onchip
+print "Waiting for initializing target and debugger MMU..."
+wait !run()
+
+; Map the virtual kernel symbols to physical addresses
+; to give the debugger access to it before CPU MMU is
+; initialized
+MMU.Create 0xc0000000--0xc7ffffff  0x80000000 ; map kernel pages at RAM start
+MMU.COMMON 0xc0000000--0xffffffff            ; common area for kernel and processes
+MMU.ON
+
+; Load Linux extensions
+print "Loading Linux extensions"
+task.config &T32DIR/t32/demo/arm/kernel/linux/linux.t32
+menu.reprogram &T32DIR/t32/demo/arm/kernel/linux/linux.men
+HELP.FILTER.Add rtoslinux  ; add linux awareness manual to help filter
+
+; Group kernel area to be displayed with red bar
+GROUP.Create "kernel" 0xc0000000--0xffffffff /RED
+ 
+; Ok, we're done, let's start Linux
+  
+;Go
+print "Linux debugging ready"
+
+;do modules.cmm
+
+enddo
+

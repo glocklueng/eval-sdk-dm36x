@@ -1,0 +1,172 @@
+config PROPRIETARY_TI_CODECENGINE
+	bool
+	default n
+	help
+	    CodecEngine is the multimedia codec framework used on Davinci Platform.
+
+config PROPRIETARY_TI_DVSDK4
+	bool
+	default y
+	select FS_APPS_ALSALIB
+	help
+		The TI proprietary DVSDK combines a pre-tested set of operating
+		system, application framework, and codec libraries with example
+		programs that demonstrate decode and encode of audio and video
+		data streamed in real-time to and from peripheral devices. The
+		RidgeRun SDK only uses a subset of the DVSDK, namely Codec
+		Engine, framework components, XDAIS/XDC, andCMEM, EDMA, SDMA, 
+		and VICP utility libraries.  
+
+config PROPRIETARY_DVSDK_HAS_DSP
+	bool
+	default n
+	help
+		Enable this option if your TI SoC contains a user accessible DSP.
+
+config PROPRIETARY_TI_CODECENGINE_DM373x
+	bool "Texas Instruments CodecEngine for DM373x"
+	select SYSVIPC
+	select PROPRIETARY_TI_CODECENGINE
+	select PROPRIETARY_DVSDK_HAS_DSP
+	depends on BSP_ARCH_DM373x
+	default n
+	help
+		Codec Engine is a framework that automates the invocation and 
+		instantiation of XDAIS-compliant algorithms and XDM-compliant 
+		codecs. Codec Engine can execute in ARM-only, ARM-accelerator 
+		or accelerator-only environments.  The accelerator may be
+		a DSP or custom silicon.  Codec Engine supports concurrent 
+		execution of multiple channels and multiple instances of 
+		algorithms/codecs.  Codec Engine is proprietary software from
+		TI.
+
+config PROPRIETARY_TI_CODECENGINE_OMAP35x
+	bool "Texas Instruments CodecEngine for OMAP35x"
+	select SYSVIPC
+	select PROPRIETARY_TI_CODECENGINE
+	select PROPRIETARY_DVSDK_HAS_DSP
+	depends on ARCH_OMAP3 && !BSP_ARCH_DM373x
+	default n
+	help
+		Codec Engine is a framework that automates the invocation and 
+		instantiation of XDAIS-compliant algorithms and XDM-compliant 
+		codecs. Codec Engine can execute in ARM-only, ARM-accelerator 
+		or accelerator-only environments.  The accelerator may be
+		a DSP or custom silicon.  Codec Engine supports concurrent 
+		execution of multiple channels and multiple instances of 
+		algorithms/codecs.  Codec Engine is proprietary software from
+		TI.
+
+config PROPRIETARY_TI_CODECENGINE_DM365
+	bool "Texas Instruments CodecEngine for DM365"
+	select SYSVIPC
+	select PROPRIETARY_TI_CODECENGINE
+	depends on ARCH_DAVINCI_DM365 && !BSP_ARCH_DM368
+	default n
+	help
+		Codec Engine is a framework that automates the invocation and 
+		instantiation of XDAIS-compliant algorithms and XDM-compliant 
+		codecs. Codec Engine can execute in ARM-only, ARM-accelerator 
+		or accelerator-only environments.  The accelerator may be
+		a DSP or custom silicon.  Codec Engine supports concurrent 
+		execution of multiple channels and multiple instances of 
+		algorithms/codecs.  Codec Engine is proprietary software from
+		TI.
+
+config PROPRIETARY_TI_CODECENGINE_DM368
+	bool "Texas Instruments CodecEngine for DM368"
+	select SYSVIPC
+	select PROPRIETARY_TI_CODECENGINE
+	depends on BSP_ARCH_DM368
+	default n
+	help
+		Codec Engine is a framework that automates the invocation and 
+		instantiation of XDAIS-compliant algorithms and XDM-compliant 
+		codecs. Codec Engine can execute in ARM-only, ARM-accelerator 
+		or accelerator-only environments.  The accelerator may be
+		a DSP or custom silicon.  Codec Engine supports concurrent 
+		execution of multiple channels and multiple instances of 
+		algorithms/codecs.  Codec Engine is proprietary software from
+		TI.
+
+config PROPRIETARY_TI_CODECENGINE_OMAPL138
+	bool "Texas Instruments CodecEngine for OMAPL138"
+	select SYSVIPC
+	select PROPRIETARY_TI_CODECENGINE
+	select PROPRIETARY_DVSDK_HAS_DSP
+	depends on ARCH_DAVINCI_DA850 
+	default n
+	help
+		Codec Engine is a framework that automates the invocation and 
+		instantiation of XDAIS-compliant algorithms and XDM-compliant 
+		codecs. Codec Engine can execute in ARM-only, ARM-accelerator 
+		or accelerator-only environments.  The accelerator may be
+		a DSP or custom silicon.  Codec Engine supports concurrent 
+		execution of multiple channels and multiple instances of 
+		algorithms/codecs.  Codec Engine is proprietary software from
+		TI.
+
+config PROPRIETARY_DVSDK_RESERVED_MEMORY
+	bool "Automatically calculate kernel memory size"
+	default y
+	depends on PROPRIETARY_TI_CODECENGINE
+	help
+	    If this option is enabled, the RidgeRun SDK will calculate the
+	    amount of memory left over for the kernel onces all the memory
+	    pools for cmem, dsp/hardware accelerator, and video buffers
+	    has been subtracted from the total amount of SD RAM.  The SDK
+	    will automatically add to the kernel command line the mem=XX
+	    argument.  Say no if you are passing a mem=XX parameter to the 
+	    kernel using the Extra kernel arguments (BSP_EXTRA_BOOT_ARGS)
+	    SDK configuration setting.
+
+config PROPRIETARY_DVSDK_MEM_VALUE
+	hex "Memory reserved for DVSDK"
+	depends on PROPRIETARY_DVSDK_RESERVED_MEMORY
+	default 0x1D00000
+	help
+	    Amount of memory to be reserved for DVSDK components (cmem, dsp, 
+	    video buffers, etc).  The size of this memory varies depending
+	    on the audio / video streaming features being used.  See 
+	    http://processors.wiki.ti.com/index.php/CMEM_Overview
+	    for details on how to calculate this value for your use model.
+
+config PROPRIETARY_DVSDK_AUTO_SETUP_CMEM
+	bool "Automatically setup CMEM at the beggining of the reserved memory area"
+	default y
+	depends on PROPRIETARY_TI_CODECENGINE
+	select SH_MATH_SUPPORT_64
+	select FEATURE_TEST_64
+	help
+	    Enable this option to have the RidgeRun SDK set the CMEM 
+	    reserved memory area to reside right after the memory used by 
+	    the Linux kernel.  Say no if you control the loading of cmem
+	    driver.
+
+config PROPRIETARY_DVSDK_CMEM_START_ADDRESS
+	hex "CMEM start address"
+	depends on !PROPRIETARY_DVSDK_AUTO_SETUP_CMEM && PROPRIETARY_TI_CODECENGINE
+	help
+	    Starting address for CMEM memory region.
+
+config PROPRIETARY_DVSDK_CMEM_RESERVED_MEMORY
+	hex "Amount of reserved memory for cmemk"
+	depends on PROPRIETARY_TI_CODECENGINE
+	default 0xF00000
+	help
+	    Size of memory region controlled by the CMEM driver.
+
+config PROPRIETARY_TI_DMAI_DEMOS
+	bool "Install TI DMAI demos on file system"
+	default n
+	help
+	    Enable the installation of the TI DMAI demo applications
+	    on the file system.
+
+config PROPRIETARY_TI_CMEM_DEBUG
+        bool "Enable CMEM debug library"
+        depends on PROPRIETARY_TI_CODECENGINE
+        default n
+        help
+           build CMEM debug library 
+

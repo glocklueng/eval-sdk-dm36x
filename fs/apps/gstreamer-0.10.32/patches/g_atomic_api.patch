@@ -1,0 +1,164 @@
+From f3eac7de22d576edf7d0e74830d8336f81dc376b Mon Sep 17 00:00:00 2001
+From: David Schleef <ds@schleef.org>
+Date: Sat, 4 Jun 2011 00:30:15 -0700
+Subject: Work around changes in g_atomic API
+
+See #651514 for details.  It's apparently impossible to write code
+that avoids both type punning warnings with old g_atomic headers and
+assertions in the new.  Thus, macros and a version check.
+
+Index: gstreamer-0.10.32/src/gst/glib-compat-private.h
+===================================================================
+--- gstreamer-0.10.32.orig/src/gst/glib-compat-private.h	2015-08-17 13:18:00.501624017 -0600
++++ gstreamer-0.10.32/src/gst/glib-compat-private.h	2015-08-17 13:18:00.493624017 -0600
+@@ -26,6 +26,26 @@
+ #define GLIB_HAS_GDATETIME
+ #endif
+ 
++/* See bug #651514 */
++#if GLIB_CHECK_VERSION(2,29,5)
++#define G_ATOMIC_POINTER_COMPARE_AND_EXCHANGE(a,b,c) \
++    g_atomic_pointer_compare_and_exchange ((a),(b),(c))
++#define G_ATOMIC_INT_COMPARE_AND_EXCHANGE(a,b,c) \
++    g_atomic_int_compare_and_exchange ((a),(b),(c))
++#else
++#define G_ATOMIC_POINTER_COMPARE_AND_EXCHANGE(a,b,c) \
++    g_atomic_pointer_compare_and_exchange ((volatile gpointer *)(a),(b),(c))
++#define G_ATOMIC_INT_COMPARE_AND_EXCHANGE(a,b,c) \
++    g_atomic_int_compare_and_exchange ((volatile int *)(a),(b),(c))
++#endif
++
++/* See bug #651514 */
++#if GLIB_CHECK_VERSION(2,29,5)
++#define G_ATOMIC_INT_ADD(a,b) g_atomic_int_add ((a),(b))
++#else
++#define G_ATOMIC_INT_ADD(a,b) g_atomic_int_exchange_and_add ((a),(b))
++#endif
++
+ /* copies */
+ 
+ /* adaptations */
+Index: gstreamer-0.10.32/src/gst/gstelementfactory.c
+===================================================================
+--- gstreamer-0.10.32.orig/src/gst/gstelementfactory.c	2015-08-17 13:18:00.501624017 -0600
++++ gstreamer-0.10.32/src/gst/gstelementfactory.c	2015-08-17 13:18:00.497624017 -0600
+@@ -390,8 +390,8 @@
+    * an element at the same moment
+    */
+   oclass = GST_ELEMENT_GET_CLASS (element);
+-  if (!g_atomic_pointer_compare_and_exchange (
+-          (gpointer) & oclass->elementfactory, NULL, factory))
++  if (!G_ATOMIC_POINTER_COMPARE_AND_EXCHANGE (&oclass->elementfactory, NULL,
++          factory))
+     gst_object_unref (factory);
+ 
+   GST_DEBUG ("created element \"%s\"", GST_PLUGIN_FEATURE_NAME (factory));
+Index: gstreamer-0.10.32/src/gst/gstpoll.c
+===================================================================
+--- gstreamer-0.10.32.orig/src/gst/gstpoll.c	2015-08-17 13:18:00.501624017 -0600
++++ gstreamer-0.10.32/src/gst/gstpoll.c	2015-08-17 13:18:00.497624017 -0600
+@@ -57,6 +57,7 @@
+ #endif
+ 
+ #include "gst_private.h"
++#include "glib-compat-private.h"
+ 
+ #include <sys/types.h>
+ 
+@@ -154,8 +155,8 @@
+ #define IS_FLUSHING(s)      (g_atomic_int_get(&(s)->flushing))
+ #define SET_FLUSHING(s,val) (g_atomic_int_set(&(s)->flushing, (val)))
+ 
+-#define INC_WAITING(s)      (g_atomic_int_exchange_and_add(&(s)->waiting, 1))
+-#define DEC_WAITING(s)      (g_atomic_int_exchange_and_add(&(s)->waiting, -1))
++#define INC_WAITING(s)      (G_ATOMIC_INT_ADD(&(s)->waiting, 1))
++#define DEC_WAITING(s)      (G_ATOMIC_INT_ADD(&(s)->waiting, -1))
+ #define GET_WAITING(s)      (g_atomic_int_get(&(s)->waiting))
+ 
+ #define TEST_REBUILD(s)     (g_atomic_int_compare_and_exchange(&(s)->rebuild, 1, 0))
+@@ -176,7 +177,7 @@
+ {
+   gboolean result = TRUE;
+ 
+-  if (g_atomic_int_exchange_and_add (&set->control_pending, 1) == 0) {
++  if (G_ATOMIC_INT_ADD (&set->control_pending, 1) == 0) {
+     /* raise when nothing pending */
+     result = WAKE_EVENT (set);
+   }
+Index: gstreamer-0.10.32/src/gst/gstsystemclock.c
+===================================================================
+--- gstreamer-0.10.32.orig/src/gst/gstsystemclock.c	2015-08-17 13:18:00.501624017 -0600
++++ gstreamer-0.10.32/src/gst/gstsystemclock.c	2015-08-17 13:18:00.497624017 -0600
+@@ -44,6 +44,7 @@
+ #include "gstenumtypes.h"
+ #include "gstpoll.h"
+ #include "gstutils.h"
++#include "glib-compat-private.h"
+ 
+ #include <errno.h>
+ 
+@@ -55,8 +56,8 @@
+ 
+ #define GET_ENTRY_STATUS(e)          (g_atomic_int_get(&GST_CLOCK_ENTRY_STATUS(e)))
+ #define SET_ENTRY_STATUS(e,val)      (g_atomic_int_set(&GST_CLOCK_ENTRY_STATUS(e),(val)))
+-#define CAS_ENTRY_STATUS(e,old,val)  (g_atomic_int_compare_and_exchange(\
+-                                       ((volatile gint *)&GST_CLOCK_ENTRY_STATUS(e)), (old), (val)))
++#define CAS_ENTRY_STATUS(e,old,val)  (G_ATOMIC_INT_COMPARE_AND_EXCHANGE(\
++                                       (&GST_CLOCK_ENTRY_STATUS(e)), (old), (val)))
+ 
+ /* Define this to get some extra debug about jitter from each clock_wait */
+ #undef WAIT_DEBUGGING
+Index: gstreamer-0.10.32/src/gst/gstutils.c
+===================================================================
+--- gstreamer-0.10.32.orig/src/gst/gstutils.c	2015-08-17 13:18:00.501624017 -0600
++++ gstreamer-0.10.32/src/gst/gstutils.c	2015-08-17 13:18:00.497624017 -0600
+@@ -39,6 +39,7 @@
+ #include "gstparse.h"
+ #include "gstvalue.h"
+ #include "gst-i18n-lib.h"
++#include "glib-compat-private.h"
+ #include <math.h>
+ 
+ /**
+@@ -704,7 +705,7 @@
+ gst_util_seqnum_next (void)
+ {
+   static gint counter = 0;
+-  return g_atomic_int_exchange_and_add (&counter, 1);
++  return G_ATOMIC_INT_ADD (&counter, 1);
+ }
+ 
+ /**
+Index: gstreamer-0.10.32/src/plugins/elements/gstmultiqueue.c
+===================================================================
+--- gstreamer-0.10.32.orig/src/plugins/elements/gstmultiqueue.c	2015-08-17 13:18:00.501624017 -0600
++++ gstreamer-0.10.32/src/plugins/elements/gstmultiqueue.c	2015-08-17 13:18:00.497624017 -0600
+@@ -110,6 +110,7 @@
+ 
+ #include <gst/gst.h>
+ #include "gstmultiqueue.h"
++#include <gst/glib-compat-private.h>
+ 
+ /**
+  * GstSingleQueue:
+Index: gstreamer-0.10.32/src/tests/benchmarks/gstclockstress.c
+===================================================================
+--- gstreamer-0.10.32.orig/src/tests/benchmarks/gstclockstress.c	2015-08-17 13:18:00.501624017 -0600
++++ gstreamer-0.10.32/src/tests/benchmarks/gstclockstress.c	2015-08-17 13:18:00.497624017 -0600
+@@ -20,6 +20,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <gst/gst.h>
++#include <gst/glib-compat-private.h>
+ 
+ #define MAX_THREADS  100
+ 
+@@ -34,7 +35,7 @@
+ 
+   while (running) {
+     gst_clock_get_time (sysclock);
+-    prev = g_atomic_int_exchange_and_add (&count, 1);
++    prev = G_ATOMIC_INT_ADD (&count, 1);
+     if (prev == G_MAXINT)
+       g_warning ("overflow");
+   }

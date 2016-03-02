@@ -1,0 +1,54 @@
+Index: dvsdk-4_02_00_06/dvsdk/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/Makefile	2011-01-25 13:10:11.834259967 -0600
++++ dvsdk-4_02_00_06/dvsdk/Makefile	2011-01-25 13:26:26.209256607 -0600
+@@ -1,3 +1,13 @@
++ifneq ($(BUILDING_FROM_RR_SDK),yes)
++$(error ERROR: This DVSDK is currently being used by the RidgeRun SDK at \
++"$(shell cat rrsdk_path)". RidgeRun SDK modifies the standard DVSDK, so it \
++cannot longer be used from the dvsdk main makefile. To revert this changes \
++you need to run the command: "make -C $(shell cat rrsdk_path) clean", or to \
++remove and re-install this dvsdk if the original RidgeRun SDK is not longer \
++available. \
++)
++endif
++
+ include Rules.make
+ 
+ DEFAULT_LINUXKERNEL_CONFIG=davinci_dm365_defconfig
+@@ -286,6 +296,35 @@
+ 	EXEC_DIR_$(PLATFORM)_al=$(EXEC_DIR)/usr/share/ti/ti-dmai-apps \
+ 	install
+ 
++#==============================================================================
++# Build the Codec Engine for the configured
++# platform. Also, an explicit cleanup target is defined.
++#==============================================================================
++ce_build:
++	$(MAKE) -C $(CE_INSTALL_DIR) PLATFORM=$(PLATFORM)_al \
++	CE_INSTALL_DIR_$(PLATFORM)_al=$(CE_INSTALL_DIR) \
++	CODEC_INSTALL_DIR_$(PLATFORM)_al=$(CODEC_INSTALL_DIR) \
++	CMEM_INSTALL_DIR_$(PLATFORM)_al=$(CMEM_INSTALL_DIR) \
++	FC_INSTALL_DIR_$(PLATFORM)_al=$(FC_INSTALL_DIR) \
++	XDAIS_INSTALL_DIR_$(PLATFORM)_al=$(XDAIS_INSTALL_DIR) \
++	LINUXLIBS_INSTALL_DIR_$(PLATFORM)_al=$(LINUXLIBS_INSTALL_DIR) \
++	LINUXKERNEL_INSTALL_DIR_$(PLATFORM)_al=$(LINUXKERNEL_INSTALL_DIR) \
++	CROSS_COMPILE_$(PLATFORM)_al=$(CSTOOL_PREFIX) \
++	XDC_INSTALL_DIR_$(PLATFORM)_al=$(XDC_INSTALL_DIR) \
++	CROSS_COMPILE=$(CSTOOL_PREFIX) \
++	VERBOSE=true \
++	all
++
++ce_clean:
++	$(MAKE) -C $(CE_INSTALL_DIR) PLATFORM=$(PLATFORM)_al \
++	XDC_INSTALL_DIR_$(PLATFORM)_al=$(XDC_INSTALL_DIR) \
++	clean
++
++ce_install:
++	$(MAKE) -C $(CE_INSTALL_DIR) PLATFORM=$(PLATFORM)_al \
++	EXEC_DIR_$(PLATFORM)_al=$(EXEC_DIR)/usr/share/ti/ti-ce-apps \
++	install
++
+ ###############################################################################
+ # Build codec engine examples
+ ###############################################################################

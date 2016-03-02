@@ -1,0 +1,16 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm368leopard.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/include/configs/davinci_dm368leopard.h	2011-06-10 11:25:19.631612548 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm368leopard.h	2011-06-10 11:26:12.023964674 -0600
+@@ -69,6 +69,11 @@
+ #define CONFIG_SYS_I2C_SPEED		400000
+ #define CONFIG_SYS_I2C_SLAVE		0x10	/* SMBus host address */
+ 
++/* GPIO */
++#define CONFIG_GPIO
++#define CONFIG_DAVINCI_GPIO
++#define CONFIG_CMD_GPIO
++
+ /* SPI */
+ #define CONFIG_CMD_SPI
+ #define CONFIG_DAVINCI_SPI

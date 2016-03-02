@@ -1,0 +1,163 @@
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.h
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2object.h	2012-12-17 18:07:47.000000000 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.h	2013-02-04 09:55:30.982135724 -0600
+@@ -147,7 +147,8 @@
+   v4l2_std_id tv_norm;
+   gchar *channel;
+   gulong frequency;
+-
++  gchar *input_src;
++  gint   input_id;
+   /* X-overlay */
+   GstV4l2Xv *xv;
+   gulong xwindow_id;
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2object.c	2013-02-04 09:55:30.950135726 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.c	2013-02-04 09:55:30.986135724 -0600
+@@ -549,6 +549,10 @@
+     gst_v4l2_object_clear_format_list (v4l2object);
+   }
+ 
++  if (v4l2object->input_src) {
++    g_free (v4l2object->input_src);
++  }
++
+   g_free (v4l2object);
+ }
+ 
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2src.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2src.c	2013-02-04 09:55:30.970135724 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2src.c	2013-02-04 09:55:30.986135724 -0600
+@@ -77,6 +77,7 @@
+   PROP_0,
+   V4L2_STD_OBJECT_PROPS,
+   PROP_CHAIN_IPIPE,
++  PROP_INPUT_SRC,
+   PROP_LAST
+ };
+ 
+@@ -168,6 +169,9 @@
+           "Selects if the ipipe will be chained or not",
+           PROP_DEF_CHAIN_IPIPE, G_PARAM_READWRITE));
+ 
++  g_object_class_install_property (gobject_class, PROP_INPUT_SRC,
++      g_param_spec_string ("input-src", "Select the input source",
++          "Select the input source)", NULL, G_PARAM_READWRITE));
+   /**
+    * GstV4l2Src::prepare-format:
+    * @v4l2src: the v4l2src instance
+@@ -237,6 +241,7 @@
+   v4l2src->davinci_previewer_fd  = -1;
+   /*Chain the dm36x's ipipe by default*/
+   v4l2src->chain_ipipe = PROP_DEF_CHAIN_IPIPE;
++  v4l2src->v4l2object->input_src = NULL;
+ 
+   gst_base_src_set_format (GST_BASE_SRC (v4l2src), GST_FORMAT_TIME);
+   gst_base_src_set_live (GST_BASE_SRC (v4l2src), TRUE);
+@@ -283,6 +288,10 @@
+       case PROP_CHAIN_IPIPE:
+         v4l2src->chain_ipipe = g_value_get_boolean (value);
+         break;
++      case PROP_INPUT_SRC:
++        v4l2src->v4l2object->input_src =
++          g_ascii_strup(g_value_get_string(value), -1);
++        break;
+       default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+         break;
+@@ -302,6 +311,9 @@
+       case PROP_CHAIN_IPIPE:
+         g_value_set_boolean (value, v4l2src->chain_ipipe);
+         break;
++      case PROP_INPUT_SRC:
++        g_value_set_string(value, v4l2src->v4l2object->input_src);
++        break;
+       default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+         break;
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/v4l2_calls.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/v4l2_calls.c	2013-02-04 09:57:06.522134660 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/v4l2_calls.c	2013-02-04 09:57:44.146134244 -0600
+@@ -110,7 +110,7 @@
+ gst_v4l2_fill_lists (GstV4l2Object * v4l2object)
+ {
+   gint n;
+-
++  gboolean input_src_found = FALSE;
+   GstElement *e;
+ 
+   e = v4l2object->element;
+@@ -125,6 +125,9 @@
+     GstV4l2TunerChannel *v4l2channel;
+     GstTunerChannel *channel;
+ 
++    if (input_src_found)
++      break;
++
+     memset (&input, 0, sizeof (input));
+ 
+     input.index = n;
+@@ -141,6 +144,45 @@
+       }
+     }
+ 
++    /* If the input-src property was used, record the corresponding input */
++    if (v4l2object->input_src) {
++      gchar    *input_name  = g_ascii_strup((gchar*)input.name, -1);
++      gboolean  input_match;
++      GST_DEBUG_OBJECT (e, "Input src %s name %s", v4l2object->input_src, input_name);
++      input_match = (strcmp(input_name, v4l2object->input_src) == 0);
++
++      g_free(input_name);
++
++      if (input_match) {
++         input_src_found = TRUE;
++         v4l2object->input_id = input.index;
++      } else {
++         continue;
++      }
++    }
++
++    /* Try setting the input and see if we can retrieve it as a valid setting.
++     * This is also needed to ensure the driver gets initialized properly.
++     */
++    if (gst_v4l2_set_input(v4l2object, input.index)) {
++      gint g_index;
++
++      if (!gst_v4l2_get_input(v4l2object, &g_index)) {
++        return FALSE;
++      }
++
++      if (input.index != g_index) {
++        GST_ELEMENT_ERROR (e, RESOURCE, SETTINGS,
++          (_("Attempted to set video input to %d in device '%s', "
++            "but it still has an input setting of %d.  Please make sure the "
++            "video input is connected properly."),
++            input.index, v4l2object->videodev, g_index),
++            NULL);
++          return FALSE;
++      }
++    }
++
++
+     GST_LOG_OBJECT (e, "   index:     %d", input.index);
+     GST_LOG_OBJECT (e, "   name:      '%s'", input.name);
+     GST_LOG_OBJECT (e, "   type:      %08x", input.type);
+@@ -381,6 +423,13 @@
+   }
+   v4l2object->colors = g_list_reverse (v4l2object->colors);
+ 
++  if (v4l2object->input_src && !input_src_found) {
++    GST_ELEMENT_ERROR (v4l2object->element, RESOURCE, NOT_FOUND,
++        (_("Specified input-src '%s' was not found."),
++            v4l2object->input_src), NULL);
++  }
++
++
+   GST_DEBUG_OBJECT (e, "done");
+   return TRUE;
+ }

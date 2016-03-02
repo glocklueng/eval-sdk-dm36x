@@ -1,0 +1,99 @@
+Index: ti-flash-utils/src/DM36x/Common/src/device.c
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/Common/src/device.c	2013-05-14 14:26:48.391184329 -0600
++++ ti-flash-utils/src/DM36x/Common/src/device.c	2013-05-14 14:26:48.547176278 -0600
+@@ -382,6 +382,7 @@
+ Uint32 DEVICE_init()
+ {
+   Uint32 status = E_PASS;
++  Uint32 temp;
+  
+    // Mask all interrupts
+   AINTC->INTCTL = 0x4;
+@@ -423,6 +424,7 @@
+ #endif
+   // AEMIF Setup
+   if (status == E_PASS) status |= DEVICE_EMIFInit();
++  temp = AEMIF->NANDERRADD1;
+ 
+   // UART0 Setup
+   if (status == E_PASS) status |= DEVICE_UART0Init();
+Index: ti-flash-utils/src/Common/ubl/src/nandboot.c
+===================================================================
+--- ti-flash-utils.orig/src/Common/ubl/src/nandboot.c	2013-05-14 14:24:23.874642280 -0600
++++ ti-flash-utils/src/Common/ubl/src/nandboot.c	2013-05-14 14:27:06.562246267 -0600
+@@ -173,6 +173,9 @@
+     // application header in the NAND flash at the next block.
+     if(readError != E_PASS) {
+       if(failedOnceAlready) {
++        DEBUG_printString("Failed loading U-boot image at ");
++        DEBUG_printHexInt(blockNum);
++        DEBUG_printString(". Searching other blocks...\r\n");
+         blockNum++;
+         goto NAND_startAgain;
+       }
+Index: ti-flash-utils/src/DM36x/Common/src/device_nand.c
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/Common/src/device_nand.c	2013-05-14 14:24:23.914640215 -0600
++++ ti-flash-utils/src/DM36x/Common/src/device_nand.c	2013-05-14 14:26:48.547176278 -0600
+@@ -226,6 +226,18 @@
+   Uint16 addOffset, corrValue;
+   Uint16* syndrome10 = (Uint16 *)readECC;
+ 
++  /*
++   * Check for an ECC where all bytes are 0xFF.  If this is the case, we
++   * will assume we are looking at an erased page and we should ignore
++   * the ECC. Notice we need to check for the first 10 bits
++   */
++  for (i = 0; i < 10; i+=2) {
++    if (readECC[i] != 0xFF && readECC[i+1] != 0x3)
++	  break;
++  }
++  if (i == 10)
++    return 0;
++
+   // Clear bit13 of NANDFCR
+   temp = AEMIF->NANDERRADD1;
+   
+@@ -248,16 +260,35 @@
+ 
+   // Start calcuating the correction addresses and values
+   AEMIF->NANDFCR |= (0x1U << DEVICE_EMIF_NANDFCR_4BITECC_ADD_CALC_START_SHIFT);
+-  
+-  // Loop until timeout or the ECC calculations are complete (bit 11:10 == 00b)
++
++  /*
++   * Wait for the corr_state field (bits 8 to 11) in the
++   * NAND Flash Status register to be not equal to 0x0, 0x1, 0x2, or 0x3.
++   * Otherwise ECC calculation has not even begun and the next loop might
++   * fail because of a false positive!
++   */
+   i = NAND_TIMEOUT;
+   do
+   {
+-    temp = (AEMIF->NANDFSR & DEVICE_EMIF_NANDFSR_ECC_STATE_MASK)>>10;
+-    i--;
++    temp = AEMIF->NANDFSR;
++    temp &= 0xC00;
++	i--;
+   }
+-  while((i>0) && (temp != 0x0));
+-
++  while((i>0) && (!temp));
++	
++  /*
++   * Wait for the corr_state field (bits 8 to 11) in the
++   * NAND Flash Status register to be equal to 0x0, 0x1, 0x2, or 0x3.
++   */
++  i = NAND_TIMEOUT;
++  do
++  {
++    temp = AEMIF->NANDFSR;
++    temp &= 0xC00;
++	i--;
++  }
++  while((i>0) && (temp));
++ 
+   // Read final correction state (should be 0x0, 0x1, 0x2, or 0x3)
+   corrState = (AEMIF->NANDFSR & DEVICE_EMIF_NANDFSR_ECC_STATE_MASK) >> DEVICE_EMIF_NANDFSR_ECC_STATE_SHIFT;
+ 

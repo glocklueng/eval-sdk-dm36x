@@ -1,0 +1,130 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/Makefile	2012-12-01 15:39:34.004503198 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/Makefile	2012-12-02 11:51:37.639909532 -0600
+@@ -15,6 +15,7 @@
+ obj-$(CONFIG_ARCH_DAVINCI_DM355)        += dm355.o devices.o
+ obj-$(CONFIG_ARCH_DAVINCI_DM646x)       += dm646x.o devices.o
+ obj-$(CONFIG_ARCH_DAVINCI_DM365)	+= dm365.o devices.o dm36x-mux-debug.o
++obj-$(CONFIG_ARCH_DAVINCI_DM365)        += dm36x-gpio-debug.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA830)        += da830.o devices-da8xx.o
+ obj-$(CONFIG_ARCH_DAVINCI_DA850)        += da850.o devices-da8xx.o
+ 
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm36x-gpio-debug.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm36x-gpio-debug.c	2012-12-02 11:56:17.518122924 -0600
+@@ -0,0 +1,64 @@
++/*
++ * TI DaVinci DM36x gpio dump debugfs entry
++ *
++ * Copyright (C) 2012 RidgeRun
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/autoconf.h>
++
++#if defined(CONFIG_DEBUG_FS)
++#include <linux/stddef.h>
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
++#include <mach/hardware.h>
++#include <asm/io.h>
++#include <mach/gpio.h>
++
++static int dm36x_gpio_dump_dbg_board_show(struct seq_file *s, void *unused)
++{
++	unsigned		gpio;
++
++	for (gpio = 0; gpio <  DAVINCI_N_GPIO; gpio++) {
++		seq_printf(s, "gpio %3d: %3s %d\n", gpio,
++			   davinci_gpio_get_direction(gpio) ? "in" : "out",
++			   davinci_gpio_get_value(gpio));
++	}
++	return 0;
++}
++
++static int dm36x_gpio_dump_dbg_board_open(struct inode *inode, struct file *file)
++{
++
++	return single_open(file, dm36x_gpio_dump_dbg_board_show, &inode->i_private);
++}
++
++static const struct file_operations dm36x_gpio_dump_dbg_board_fops = {
++	.open		= dm36x_gpio_dump_dbg_board_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++static void __init dm36x_gpio_dump_dbg_init(void)
++{
++	debugfs_create_file("dm36x_gpio_dump", S_IRUGO, NULL,
++			    NULL, &dm36x_gpio_dump_dbg_board_fops);
++}
++
++static int __init dm36x_gpio_dump_late_init(void)
++{
++	dm36x_gpio_dump_dbg_init();
++
++	return 0;
++}
++
++late_initcall(dm36x_gpio_dump_late_init);
++#endif
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/gpio.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/gpio.h	2011-03-24 18:27:25.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/gpio.h	2012-12-02 11:54:38.306747410 -0600
+@@ -117,7 +117,7 @@
+ 	__gpio_set_value(gpio, value);
+ }
+ 
+-/* Returns zero or nonzero; works for gpios configured as inputs OR
++/* Returns zero or one; works for gpios configured as inputs OR
+  * as outputs, at least for built-in GPIOs.
+  *
+  * NOTE: for built-in GPIOs, changes in reported values are synchronized
+@@ -131,10 +131,33 @@
+ 	struct gpio_controller	*__iomem g;
+ 
+ 	if (!__builtin_constant_p(gpio) || gpio >= DAVINCI_N_GPIO)
+-		return __gpio_get_value(gpio);
++		return __gpio_get_value(gpio) ? 1 : 0;
+ 
+ 	g = __gpio_to_controller(gpio);
+-	return __gpio_mask(gpio) & __raw_readl(&g->in_data);
++	return __gpio_mask(gpio) & __raw_readl(&g->in_data) ? 1 : 0;
++}
++
++static inline int davinci_gpio_get_value(unsigned gpio)
++{
++	struct gpio_controller	*__iomem g;
++
++	if (gpio >= DAVINCI_N_GPIO)
++		return 0;
++
++	g = __gpio_to_controller(gpio);
++	return __gpio_mask(gpio) & __raw_readl(&g->in_data) ? 1 : 0;
++}
++
++/* Returns non-zero if gpio is configured as an input */
++static inline int davinci_gpio_get_direction(unsigned gpio)
++{
++	struct gpio_controller	*__iomem g;
++
++	if (gpio >= DAVINCI_N_GPIO)
++		return 0;
++
++	g = __gpio_to_controller(gpio);
++	return __gpio_mask(gpio) & __raw_readl(&g->dir);
+ }
+ 
+ static inline int gpio_cansleep(unsigned gpio)

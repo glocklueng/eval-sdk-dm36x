@@ -1,0 +1,10 @@
+#add_mp3_support_dmai_plugins.patch
+prgb_tidmaivideosink_support.patch
+#add_facedetect_plugin.patch
+dual-encoder-support.patch
+enable-cmem-debug.patch
+add-gdr.patch
+resizer-add-bayer-input-support.patch
+set-perf-as-passthrough.patch
+encoder-dynamic-framerate-change.patch
+fix-mutex-premature-invalidation.patch

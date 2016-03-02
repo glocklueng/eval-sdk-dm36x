@@ -1,0 +1,417 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/drivers/spi/davinci_spi.c
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/drivers/spi/davinci_spi.c
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/drivers/spi/davinci_spi.c
+@@ -28,9 +28,38 @@
+ #include <spi.h>
+ #include <malloc.h>
+ #include <asm/io.h>
++#include <asm/byteorder.h>
+ #include <asm/arch/hardware.h>
+ #include "davinci_spi.h"
+ 
++struct davinci_spi_capabilities {
++	void *base_address;
++	unsigned int max_cs;
++};
++
++static const struct davinci_spi_capabilities dm365_spi_capabilities[] = {
++	{
++		.base_address = (void *)0x01C66000,
++		.max_cs = 2,
++	},
++	{
++		.base_address = (void *)0x01C66800,
++		.max_cs = 2,
++	},
++	{
++		.base_address = (void *)0x01C67800,
++		.max_cs = 2,
++	},
++	{
++		.base_address = (void *)0x01C68000,
++		.max_cs = 2,
++	},
++	{
++		.base_address = (void *)0x01C23000,
++		.max_cs = 2,
++	},
++};
++
+ void spi_init()
+ {
+ 	/* do nothing */
+@@ -85,21 +114,21 @@
+ 
+ 	/*
+ 	 * Use following format:
+-	 *   character length = 8,
+ 	 *   clock signal delayed by half clk cycle,
+ 	 *   clock low in idle state - Mode 0,
+ 	 *   MSB shifted out first
+ 	 */
+-	writel(8 | (scalar << SPIFMT_PRESCALE_SHIFT) |
++	writel((scalar << SPIFMT_PRESCALE_SHIFT) |
+ 		(1 << SPIFMT_PHASE_SHIFT), &ds->regs->fmt0);
+ 
++#if 0
+ 	/*
+ 	 * Including a minor delay. No science here. Should be good even with
+ 	 * no delay
+ 	 */
+ 	writel((50 << SPI_C2TDELAY_SHIFT) |
+ 		(50 << SPI_T2CDELAY_SHIFT), &ds->regs->delay);
+-
++#endif
+ 	/* default chip select register */
+ 	writel(SPIDEF_CSDEF0_MASK, &ds->regs->def);
+ 
+@@ -142,10 +171,14 @@
+ }
+ 
+ static int davinci_spi_read(struct spi_slave *slave, unsigned int len,
+-			    u8 *rxp, unsigned long flags)
++			    unsigned int bitsperxfer, void *rxp,
++			    unsigned long flags)
+ {
+ 	struct davinci_spi_slave *ds = to_davinci_spi(slave);
+ 	unsigned int data1_reg_val;
++	u8 *rxpb = rxp; /* 8 bits / xfer or less */
++	u16 *rxpw = rxp; /* 9 bits / xfer or more */
++	u16 mask = (1 << bitsperxfer) - 1;
+ 
+ 	/* enable CS hold, CS[n] and clear the data bits */
+ 	data1_reg_val = ((1 << SPIDAT1_CSHOLD_SHIFT) |
+@@ -158,25 +191,35 @@
+ 	/* preload the TX buffer to avoid clock starvation */
+ 	writel(data1_reg_val, &ds->regs->dat1);
+ 
+-	/* keep reading 1 byte until only 1 byte left */
++	/* keep reading data until only 1 transfer left */
+ 	while ((len--) > 1)
+-		*rxp++ = davinci_spi_xfer_data(ds, data1_reg_val);
++		if (bitsperxfer <= 8)
++			*rxpb++ = davinci_spi_xfer_data(ds, data1_reg_val) & (u8)mask;
++		else
++			*rxpw++ = davinci_spi_xfer_data(ds, data1_reg_val) & (u16)mask;
+ 
+ 	/* clear CS hold when we reach the end */
+ 	if (flags & SPI_XFER_END)
+ 		data1_reg_val &= ~(1 << SPIDAT1_CSHOLD_SHIFT);
+ 
+-	/* read the last byte */
+-	*rxp = davinci_spi_xfer_data(ds, data1_reg_val);
++	/* read the last value */
++		if (bitsperxfer <= 8)
++			*rxpb++ = davinci_spi_xfer_data(ds, data1_reg_val) & (u8)mask;
++		else
++			*rxpw++ = davinci_spi_xfer_data(ds, data1_reg_val) & (u16)mask;
+ 
+ 	return 0;
+ }
+ 
+ static int davinci_spi_write(struct spi_slave *slave, unsigned int len,
+-			     const u8 *txp, unsigned long flags)
++			     unsigned int bitsperxfer, const void *txp,
++			     unsigned long flags)
+ {
+ 	struct davinci_spi_slave *ds = to_davinci_spi(slave);
+ 	unsigned int data1_reg_val;
++	const u8 *txpb = txp; /* 8 bits / xfer or less */
++	const u16 *txpw = txp; /* 9 bits / xfer or more */
++	u16 mask = (1 << bitsperxfer) - 1;
+ 
+ 	/* enable CS hold and clear the data bits */
+ 	data1_reg_val = ((1 << SPIDAT1_CSHOLD_SHIFT) |
+@@ -188,30 +231,65 @@
+ 
+ 	/* preload the TX buffer to avoid clock starvation */
+ 	if (len > 2) {
+-		writel(data1_reg_val | *txp++, &ds->regs->dat1);
++		if (bitsperxfer <= 8)
++			writel(data1_reg_val | (*txpb++ & mask), &ds->regs->dat1);
++		else {
++			writel(data1_reg_val | (swab16(*txpw++) & mask), &ds->regs->dat1);
++		}
+ 		len--;
+ 	}
+ 
+-	/* keep writing 1 byte until only 1 byte left */
++	/* keep sending data until only 1 transfer left */
+ 	while ((len--) > 1)
+-		davinci_spi_xfer_data(ds, data1_reg_val | *txp++);
++		if (bitsperxfer <= 8)
++			davinci_spi_xfer_data(ds, data1_reg_val | (*txpb++ & mask));
++		else {
++			davinci_spi_xfer_data(ds, data1_reg_val | (swab16(*txpw++) & mask));
++		}
+ 
+ 	/* clear CS hold when we reach the end */
+ 	if (flags & SPI_XFER_END)
+ 		data1_reg_val &= ~(1 << SPIDAT1_CSHOLD_SHIFT);
+ 
+-	/* write the last byte */
+-	davinci_spi_xfer_data(ds, data1_reg_val | *txp);
++	/* send the last transfer */
++	if (bitsperxfer <= 8)
++		davinci_spi_xfer_data(ds, data1_reg_val | (*txpb++ & mask));
++	else {
++		davinci_spi_xfer_data(ds, data1_reg_val | (swab16(*txpw++) & mask));
++	}
+ 
+ 	return 0;
+ }
+ 
++static void hexdump(unsigned char *buf, int len)
++{
++	int i;
++
++	for (i = 0; i < len; i++) {
++		if ((i % 16) == 0)
++			printf("%s%08x: ", i ? "\n" : "",
++							(unsigned int)&buf[i]);
++		printf("%02x ", buf[i]);
++	}
++	printf("\n");
++}
++
++
+ #ifndef CONFIG_SPI_HALF_DUPLEX
+ static int davinci_spi_read_write(struct spi_slave *slave, unsigned int len,
+-				  u8 *rxp, const u8 *txp, unsigned long flags)
++				  unsigned int bitsperxfer, void *rxp, const void *txp,
++				  unsigned long flags)
+ {
+ 	struct davinci_spi_slave *ds = to_davinci_spi(slave);
++	int ret = 0;
+ 	unsigned int data1_reg_val;
++	u8 *rxpb = rxp; /* 8 bits / xfer or less */
++	const u8 *txpb = txp; /* 8 bits / xfer or less */
++	u16 *rxpw = rxp; /* 9 bits / xfer or more */
++	const u16 *txpw = txp; /* 9 bits / xfer or more */
++	u16 mask = (1 << bitsperxfer) - 1;
++
++	writel((readl(&ds->regs->fmt0) & 0xFFFFFFE0) | bitsperxfer, &ds->regs->fmt0);
+ 
+ 	/* enable CS hold and clear the data bits */
+ 	data1_reg_val = ((1 << SPIDAT1_CSHOLD_SHIFT) |
+@@ -221,51 +299,76 @@
+ 	while (readl(&ds->regs->buf) & SPIBUF_TXFULL_MASK)
+ 		;
+ 
+-	/* keep reading and writing 1 byte until only 1 byte left */
++	/* keep reading and writing data until only 1 transfer left */
+ 	while ((len--) > 1)
+-		*rxp++ = davinci_spi_xfer_data(ds, data1_reg_val | *txp++);
++		if (bitsperxfer <= 8)
++			*rxpb++ = davinci_spi_xfer_data(ds, data1_reg_val | (*txpb++ & mask)) & mask;
++		else {
++			*rxpw++ = davinci_spi_xfer_data(ds, data1_reg_val | (swab16(*txpw++) & mask)) & mask;
++		}
+ 
+ 	/* clear CS hold when we reach the end */
+-	if (flags & SPI_XFER_END)
++	if (flags & SPI_XFER_END) {
+ 		data1_reg_val &= ~(1 << SPIDAT1_CSHOLD_SHIFT);
++		flags &= ~SPI_XFER_END;
++	}
+ 
+ 	/* read and write the last byte */
+-	*rxp = davinci_spi_xfer_data(ds, data1_reg_val | *txp);
+-
+-	return 0;
++		if (bitsperxfer <= 8)
++			*rxpb++ = davinci_spi_xfer_data(ds, data1_reg_val | (*txpb++ & mask)) & mask;
++		else {
++			*rxpw++ = davinci_spi_xfer_data(ds, data1_reg_val | (swab16(*txpw++) & mask)) & mask;
++		}
++out:
++	if (flags & SPI_XFER_END) {
++		u8 dummy = 0;
++		davinci_spi_write(slave, 1, 8, &dummy, flags);
++	}
++	return ret;
+ }
+ #endif
+ 
+-int spi_xfer(struct spi_slave *slave, unsigned int bitlen,
++int spi_xfer(struct spi_slave *slave, unsigned int bitsperxfer, unsigned int bytelen,
+ 	     const void *dout, void *din, unsigned long flags)
+ {
++	struct davinci_spi_slave *ds = to_davinci_spi(slave);
+ 	unsigned int len;
++	int ret = 0;
+ 
+-	if (bitlen == 0)
++	if (bytelen == 0)
+ 		/* Finish any previously submitted transfers */
+ 		goto out;
+ 
+-	/*
+-	 * It's not clear how non-8-bit-aligned transfers are supposed to be
+-	 * represented as a stream of bytes...this is a limitation of
+-	 * the current SPI interface - here we terminate on receiving such a
+-	 * transfer request.
+-	 */
+-	if (bitlen % 8) {
++	if ((bitsperxfer > 16) || (bitsperxfer < 2)) {
++		printf("Error. bits/transfer=%i out of boundaries (hardware supports 2..16)\n", bitsperxfer);
+ 		/* Errors always terminate an ongoing transfer */
+ 		flags |= SPI_XFER_END;
++		ret = -1;
+ 		goto out;
++ 	}
++
++	if  (bitsperxfer > 8) {
++		if (bytelen & 0x1) {
++			printf("Error. Mismatch between number of bytes of data provided and bits per transfer\n");
++			/* Errors always terminate an ongoing transfer */
++			flags |= SPI_XFER_END;
++			ret = -1;
++			goto out;
++		}
++		len = bytelen >> 1;
++	} else {
++		len = bytelen;
+ 	}
+ 
+-	len = bitlen / 8;
++	writel((readl(&ds->regs->fmt0) & 0xFFFFFFE0) | bitsperxfer, &ds->regs->fmt0);
+ 
+ 	if (!dout)
+-		return davinci_spi_read(slave, len, din, flags);
++		return davinci_spi_read(slave, len, bitsperxfer, din, flags);
+ 	else if (!din)
+-		return davinci_spi_write(slave, len, dout, flags);
++		return davinci_spi_write(slave, len, bitsperxfer, dout, flags);
+ #ifndef CONFIG_SPI_HALF_DUPLEX
+ 	else
+-		return davinci_spi_read_write(slave, len, din, dout, flags);
++		return davinci_spi_read_write(slave, len, bitsperxfer, din, dout, flags);
+ #else
+ 	printf("SPI full duplex transaction requested with "
+ 	       "CONFIG_SPI_HALF_DUPLEX defined.\n");
+@@ -275,9 +378,9 @@
+ out:
+ 	if (flags & SPI_XFER_END) {
+ 		u8 dummy = 0;
+-		davinci_spi_write(slave, 1, &dummy, flags);
++		davinci_spi_write(slave, 1, 8, &dummy, flags);
+ 	}
+-	return 0;
++	return ret;
+ }
+ 
+ int spi_cs_is_valid(unsigned int bus, unsigned int cs)
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/spi.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/include/spi.h
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/spi.h
+@@ -136,7 +136,8 @@
+  *
+  * spi_xfer() interface:
+  *   slave:	The SPI slave which will be sending/receiving the data.
+- *   bitlen:	How many bits to write and read.
++ *   bitperxfer:	How many bits to write and read per transfer
++ *   bytelen:       How many bytes are on the dout/din array
+  *   dout:	Pointer to a string of bits to send out.  The bits are
+  *		held in a byte array and are sent MSB first.
+  *   din:	Pointer to a string of bits that will be filled in.
+@@ -144,8 +145,8 @@
+  *
+  *   Returns: 0 on success, not 0 on failure
+  */
+-int  spi_xfer(struct spi_slave *slave, unsigned int bitlen, const void *dout,
+-		void *din, unsigned long flags);
++int  spi_xfer(struct spi_slave *slave, unsigned int bitsperxfer,
++		unsigned int bytelen, const void *dout, void *din, unsigned long flags);
+ 
+ /*-----------------------------------------------------------------------
+  * Determine if a SPI chipselect is valid.
+@@ -193,7 +194,7 @@
+ 	dout[0] = byte;
+ 	dout[1] = 0;
+ 
+-	ret = spi_xfer(slave, 16, dout, din, SPI_XFER_BEGIN | SPI_XFER_END);
++	ret = spi_xfer(slave, 8, 1, dout, din, SPI_XFER_BEGIN | SPI_XFER_END);
+ 	return ret < 0 ? ret : din[1];
+ }
+ 
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/common/cmd_spi.c
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/common/cmd_spi.c
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/common/cmd_spi.c
+@@ -50,7 +50,8 @@
+ static unsigned int	bus;
+ static unsigned int	cs;
+ static unsigned int	mode;
+-static int   		bitlen;
++static int   		bitsperxfer;
++static int		bytelen;
+ static uchar 		dout[MAX_SPI_BYTES];
+ static uchar 		din[MAX_SPI_BYTES];
+ 
+@@ -58,9 +59,9 @@
+  * SPI read/write
+  *
+  * Syntax:
+- *   spi {dev} {num_bits} {dout}
++ *   spi {dev} {bits_per_character} {dout}
+  *     {dev} is the device number for controlling chip select (see TBD)
+- *     {num_bits} is the number of bits to send & receive (base 10)
++ *     {bits_per_character} is the number of bits per character (base 10)
+  *     {dout} is a hexadecimal string of data to send
+  * The command prints out the hexadecimal string received via SPI.
+  */
+@@ -93,7 +94,7 @@
+ 				mode = simple_strtoul(cp+1, NULL, 10);
+ 		}
+ 		if (argc >= 3)
+-			bitlen = simple_strtoul(argv[2], NULL, 10);
++			bitsperxfer = simple_strtoul(argv[2], NULL, 10);
+ 		if (argc >= 4) {
+ 			cp = argv[3];
+ 			for(j = 0; *cp; j++, cp++) {
+@@ -111,11 +112,12 @@
+ 				else
+ 					dout[j / 2] |= tmp;
+ 			}
++			bytelen = j/2;
+ 		}
+ 	}
+ 
+-	if ((bitlen < 0) || (bitlen >  (MAX_SPI_BYTES * 8))) {
+-		printf("Invalid bitlen %d\n", bitlen);
++	if (bytelen > MAX_SPI_BYTES) {
++		printf("Data length too long %d\n", bytelen);
+ 		return 1;
+ 	}
+ 
+@@ -126,12 +128,12 @@
+ 	}
+ 
+ 	spi_claim_bus(slave);
+-	if(spi_xfer(slave, bitlen, dout, din,
++	if(spi_xfer(slave, bitsperxfer, bytelen, dout, din,
+ 				SPI_XFER_BEGIN | SPI_XFER_END) != 0) {
+ 		printf("Error during SPI transaction\n");
+ 		rcode = 1;
+ 	} else {
+-		for(j = 0; j < ((bitlen + 7) / 8); j++) {
++		for(j = 0; j < bytelen; j++) {
+ 			printf("%02X", din[j]);
+ 		}
+ 		printf("\n");
+@@ -147,10 +149,10 @@
+ U_BOOT_CMD(
+ 	sspi,	5,	1,	do_spi,
+ 	"SPI utility command",
+-	"[<bus>:]<cs>[.<mode>] <bit_len> <dout> - Send and receive bits\n"
++	"[<bus>:]<cs>[.<mode>] <bits_per_character> <dout> - Send and receive bits\n"
+ 	"<bus>     - Identifies the SPI bus\n"
+ 	"<cs>      - Identifies the chip select\n"
+ 	"<mode>    - Identifies the SPI mode to use\n"
+-	"<bit_len> - Number of bits to send (base 10)\n"
++	"<bits_per_character> - Number of bits per character (base 10)\n"
+ 	"<dout>    - Hexadecimal string that gets sent"
+ );

@@ -1,0 +1,6 @@
+config FS_APPS_GST_CRYPTO
+	bool "gst-crypto-0.10.0"
+	select FS_APPS_GSTREAMER_PLUGINS_BASE
+	help
+	  This option enables RidgeRuns gst-crypto plugin.
+

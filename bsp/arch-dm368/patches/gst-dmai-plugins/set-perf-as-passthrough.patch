@@ -1,0 +1,12 @@
+Index: gst-dmai-plugins/src/src/gsttidmaiperf.c
+===================================================================
+--- gst-dmai-plugins.orig/src/src/gsttidmaiperf.c	2014-03-27 17:46:01.000000000 -0600
++++ gst-dmai-plugins/src/src/gsttidmaiperf.c	2014-05-30 17:20:08.834964946 -0600
+@@ -123,6 +123,7 @@
+ gst_dmaiperf_init (GstDmaiperf * dmaiperf, GstDmaiperfClass * gclass)
+ {
+   gst_base_transform_set_qos_enabled (GST_BASE_TRANSFORM (dmaiperf), TRUE);
++  gst_base_transform_set_passthrough (GST_BASE_TRANSFORM (dmaiperf), TRUE);
+   dmaiperf->hDsp = NULL;
+   dmaiperf->hEngine = NULL;
+   dmaiperf->lastLoadstamp = GST_CLOCK_TIME_NONE;

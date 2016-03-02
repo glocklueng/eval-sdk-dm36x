@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<component>
+	<name>TI Flash Utils</name>
+	<version>dvsdk4</version>
+	<manufacturer>Texas Instruments</manufacturer>
+	<summary>This package contains a set of utilities running from the command-line on Windows for flashing the NAND, NOR, and SPI Flash</summary>
+	<link>http://www.ti.com/</link>
+	<issues>
+		<link><![CDATA[]]></link>
+	</issues>
+	<license type="BSD">
+		<link>https://spdx.org/licenses/BSD</link>
+		<text>
+			<![CDATA[]]>
+		</text>
+	</license>
+</component>
+

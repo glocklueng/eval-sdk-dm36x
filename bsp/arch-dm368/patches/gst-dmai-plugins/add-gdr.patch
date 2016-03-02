@@ -1,0 +1,55 @@
+Index: gst-dmai-plugins/src/src/ti_encoders.c
+===================================================================
+--- gst-dmai-plugins.orig/src/src/ti_encoders.c	2013-01-31 09:21:54.000000000 -0600
++++ gst-dmai-plugins/src/src/ti_encoders.c	2013-07-09 13:45:26.152359652 -0600
+@@ -367,6 +367,9 @@
+     PROP_RCALGO,
+     PROP_AIRRATE,
+     PROP_IDRINTERVAL,
++    PROP_GDRLEVEL,
++    PROP_GDRDURATION,
++    PROP_GDRINTERVAL,
+ };
+ 
+ gboolean ti_dm36x_h264enc_params(GstElement *element){
+@@ -530,6 +533,24 @@
+             "Interval between two consecutive IDR frames",
+             "Interval between two consecutive IDR frames",
+             0, G_MAXINT32, 0, G_PARAM_READWRITE));
++    g_object_class_install_property(gobject_class, PROP_GDRLEVEL,
++        g_param_spec_int("gdr-level",
++            "Enable Gradual Decoder Refresh",
++            "Enable Gradual Decoder Refresh:\n"
++            "\t\t\t 0: GDR feature is disable\n"
++            "\t\t\t 1: GDR feature enable\n"
++            "\t\t\t 2: GDR feature enable with good quality",
++            0, 2, 0, G_PARAM_READWRITE));
++    g_object_class_install_property(gobject_class, PROP_GDRDURATION,
++        g_param_spec_int("gdr-duration",
++            "Duration of refresh when GDR enabled",
++            "Duration of refresh when GDR enabled (must be =< gdr-interval)",
++            0, G_MAXINT32, 0, G_PARAM_READWRITE));
++    g_object_class_install_property(gobject_class, PROP_GDRINTERVAL,
++        g_param_spec_int("gdr-interval",
++            "Interval between refreshes when GDR enabled",
++            "Interval between refreshes when GDR enabled",
++            0, G_MAXINT32, 0, G_PARAM_READWRITE));
+ }
+ 
+ 
+@@ -589,6 +610,15 @@
+     case PROP_IDRINTERVAL:
+         dynParams->idrFrameInterval = g_value_get_int(value);
+         break;
++    case PROP_GDRLEVEL:
++        dynParams->enableGDR = g_value_get_int(value);
++        break;
++    case PROP_GDRDURATION:
++        dynParams->GDRduration = g_value_get_int(value);
++        break;
++    case PROP_GDRINTERVAL:
++        dynParams->GDRinterval = g_value_get_int(value);
++        break;
+     default:
+         break;
+     }

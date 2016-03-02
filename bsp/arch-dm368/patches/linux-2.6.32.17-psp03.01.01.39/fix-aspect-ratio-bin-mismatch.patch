@@ -1,0 +1,37 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c	2011-12-01 15:10:35.028569678 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c	2011-12-01 15:10:42.568598593 -0600
+@@ -667,13 +667,11 @@
+     int vblank = MT9P031_VERTICAL_BLANK_DEFAULT;
+     int fps;
+ 
+-    /* Make sure we don't exceed sensor limits */
+-    if (rect->left + rect->width > mt9p031->width_max)
+-        rect->left =
++    /* We center the capture region */
++    rect->left =
+         (mt9p031->width_max - rect->width) / 2 + mt9p031->x_min;
+ 
+-    if (rect->top + rect->height > mt9p031->height_max)
+-        rect->top =
++    rect->top =
+         (mt9p031->height_max - rect->height) / 2 + mt9p031->y_min;
+ 
+     width = rect->width * xskip;
+@@ -802,7 +800,14 @@
+     for (yskip = 8; yskip > 1; yskip--)
+         if (rect.height * yskip <= MT9P031_MAX_HEIGHT)
+             break;
+-
++	
++	if (xskip != yskip){
++		if (xskip > yskip)
++			xskip = yskip;
++		else 
++			yskip = xskip;
++	}
++	
+     recalculate_limits(mt9p031, xskip, yskip);
+     ret = mt9p031_set_params(sd, &rect, xskip, yskip);
+     return ret;

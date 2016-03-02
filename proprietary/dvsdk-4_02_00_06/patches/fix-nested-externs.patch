@@ -1,0 +1,26 @@
+Index: dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/video1/videnc1.h
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/video1/videnc1.h	2011-03-24 16:05:12.000000000 -0600
++++ dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/video1/videnc1.h	2013-04-01 16:51:55.080552054 -0600
+@@ -51,10 +51,6 @@
+ #ifndef ti_sdo_ce_video1_VIDENC1_
+ #define ti_sdo_ce_video1_VIDENC1_
+ 
+-#ifdef __cplusplus
+-extern "C" {
+-#endif
+-
+ #include <ti/xdais/dm/xdm.h>
+ #include <ti/xdais/dm/ividenc1.h>
+ 
+@@ -62,6 +58,10 @@
+ #include <ti/sdo/ce/visa.h>
+ #include <ti/sdo/ce/skel.h>
+ 
++#ifdef __cplusplus
++extern "C" {
++#endif
++
+ /** @ingroup    ti_sdo_ce_video1_VIDENC1 */
+ /*@{*/
+ 

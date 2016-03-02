@@ -1,0 +1,102 @@
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2src.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2src.c	2013-06-17 08:55:05.100346088 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2src.c	2013-06-17 08:55:16.304345896 -0600
+@@ -577,7 +577,8 @@
+     update = TRUE;
+   } else {
+     pool = NULL;
+-    min = max = 0;
++    min = 0;
++    max = obj->max_num_buffers;
+     size = 0;
+     update = FALSE;
+   }
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2object.c	2013-06-17 08:55:05.080346088 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.c	2013-06-17 08:55:16.308345896 -0600
+@@ -66,6 +66,7 @@
+ #define DEFAULT_PROP_CHANNEL            NULL
+ #define DEFAULT_PROP_FREQUENCY          0
+ #define DEFAULT_PROP_IO_MODE            GST_V4L2_IO_AUTO
++#define DEFAULT_PROP_MAX_NUM_BUFFERS    4
+ 
+ enum
+ {
+@@ -416,6 +417,10 @@
+       g_param_spec_flags ("flags", "Flags", "Device type flags",
+           GST_TYPE_V4L2_DEVICE_FLAGS, DEFAULT_PROP_FLAGS,
+           G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
++  g_object_class_install_property (gobject_class, PROP_MAX_NUM_BUFFERS,
++      g_param_spec_int ("max-num-buffers", "Maximum number of buffers",
++	  "Set the maximun number of buffers in the v4l2 pool", 2, 20,
++	  DEFAULT_PROP_MAX_NUM_BUFFERS, G_PARAM_READWRITE));
+ 
+   /**
+    * GstV4l2Src:brightness
+@@ -525,6 +530,8 @@
+ 
+   v4l2object->xwindow_id = 0;
+ 
++  v4l2object->max_num_buffers = DEFAULT_PROP_MAX_NUM_BUFFERS;
++
+   return v4l2object;
+ }
+ 
+@@ -657,6 +664,9 @@
+     case PROP_IO_MODE:
+       v4l2object->req_mode = g_value_get_enum (value);
+       break;
++    case PROP_MAX_NUM_BUFFERS:
++      v4l2object->max_num_buffers = g_value_get_int (value);
++      break;
+     default:
+       return FALSE;
+       break;
+@@ -733,6 +743,9 @@
+     case PROP_IO_MODE:
+       g_value_set_enum (value, v4l2object->req_mode);
+       break;
++    case PROP_MAX_NUM_BUFFERS:
++      g_value_set_int(value, v4l2object->max_num_buffers);
++      break;
+     default:
+       return FALSE;
+       break;
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.h
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2object.h	2013-06-17 08:55:05.088346088 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2object.h	2013-06-17 08:55:16.372345895 -0600
+@@ -149,6 +149,8 @@
+   gulong frequency;
+   gchar *input_src;
+   gint   input_id;
++  /* specify the maximum number of pool buffers */
++  gint max_num_buffers;
+   /* X-overlay */
+   GstV4l2Xv *xv;
+   gulong xwindow_id;
+@@ -176,7 +178,8 @@
+     PROP_SATURATION,			\
+     PROP_HUE,                           \
+     PROP_TV_NORM,                       \
+-    PROP_IO_MODE
++    PROP_IO_MODE,                       \
++    PROP_MAX_NUM_BUFFERS
+ 
+ /* create/destroy */
+ GstV4l2Object *	gst_v4l2_object_new 		 (GstElement * element,
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2bufferpool.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2bufferpool.c	2013-06-17 08:54:54.836346264 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2bufferpool.c	2013-06-17 08:57:42.780343385 -0600
+@@ -942,7 +942,7 @@
+   pool->obj = obj;
+ 
+   s = gst_buffer_pool_get_config (GST_BUFFER_POOL_CAST (pool));
+-  gst_buffer_pool_config_set_params (s, caps, obj->sizeimage, 2, 0);
++  gst_buffer_pool_config_set_params (s, caps, obj->sizeimage, 2, obj->max_num_buffers);
+   gst_buffer_pool_set_config (GST_BUFFER_POOL_CAST (pool), s);
+ 
+   return GST_BUFFER_POOL (pool);

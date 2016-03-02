@@ -1,0 +1,206 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/common/Makefile
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/common/Makefile	2011-05-10 13:40:17.475671722 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/common/Makefile	2011-05-10 13:41:39.115661294 -0600
+@@ -153,6 +153,7 @@
+ COBJS-$(CONFIG_CMD_XIMG) += cmd_ximg.o
+ COBJS-$(CONFIG_YAFFS2) += cmd_yaffs2.o
+ COBJS-$(CONFIG_VFD) += cmd_vfd.o
++COBJS-$(CONFIG_CMD_LCD_CMDS) += cmd_lcd_cmds.o
+ 
+ # others
+ COBJS-$(CONFIG_DDR_SPD) += ddr_spd.o
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/common/cmd_lcd_cmds.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/common/cmd_lcd_cmds.c	2011-05-10 13:41:15.888097636 -0600
+@@ -0,0 +1,142 @@
++/*
++ * cmd_lcd_cmds.c
++ *
++ * This file defines the basic functions to set commands to an LCD controller
++ * deoending on its driver
++  *
++ * Original Author:
++ *     Pablo Barrantes <pablo.barrantes@ridgerun.com>
++ *	Natanel Castro	 <natanael.castro@ridgerun.com>
++ *
++ * Copyright (C) 2011 RidgeRun - http://www.ridgerun.com/
++ *
++ */
++
++#include <common.h>
++#include <command.h>
++#include <lcd_commands.h>
++
++/*********************************************************
++ Routine: do_lcd_reg_get
++ Description:  U-boot command for reading
++					a LCD register
++*********************************************************/
++int do_lcd_reg_get (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
++{
++#ifdef LCD_DRIVER_PRESENT
++	if (argc >= 2)
++		return lcd_drv_reg_get(argv);
++
++	return 1;
++#else
++	printf("No driver for handling lcd present\n");
++	return 1;
++#endif
++}
++
++/*********************************************************
++ Routine: do_lcd_reg_set
++ Description:  U-boot command for writing
++					a LCD register
++*********************************************************/
++int do_lcd_reg_set (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
++{
++#ifdef LCD_DRIVER_PRESENT
++	if (argc >= 3)
++		return lcd_drv_reg_set(argc, argv);
++
++	return 1;
++#else
++	printf("No driver for handling lcd present\n");
++	return 1;
++#endif
++}
++
++/*********************************************************
++ Routine: do_lcd_init
++ Description:  U-boot command for initializing LCD
++*********************************************************/
++int do_lcd_init(cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
++{
++#ifdef LCD_DRIVER_PRESENT
++
++	int lcd_reset_gpio = -1;
++
++	if (argc >= 2) {
++		lcd_reset_gpio = simple_strtoul(argv[1], NULL, 10);
++	}
++
++	printf("%s: lcd reset gpio: %d\n", __FUNCTION__, lcd_reset_gpio);
++
++	return lcd_drv_init(lcd_reset_gpio);
++
++#else
++	printf("No driver for handling lcd present\n");
++	return 1;
++#endif
++}
++
++/*********************************************************
++ Routine: do_lcd_awake
++ Description:  U-boot command for switching
++				LCD to its awake mode
++*********************************************************/
++int do_lcd_awake(cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
++{
++#ifdef LCD_DRIVER_PRESENT
++	return lcd_drv_awake();
++#else
++	printf("No driver for handling lcd present\n");
++	return 1;
++#endif
++}
++
++/*********************************************************
++ Routine: do_lcd_sleep
++ Description:  U-boot command for switching
++				LCD to its sleep mode
++*********************************************************/
++int do_lcd_sleep(cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
++{
++#ifdef LCD_DRIVER_PRESENT
++	return lcd_drv_sleep();
++#else
++	printf("No driver for handling lcd present\n");
++	return 1;
++#endif
++}
++
++/***************************************************/
++
++U_BOOT_CMD(
++	lcdinit, 2, 1, do_lcd_init,
++	"Initializes LCD display",
++	"lcdinit [gpio reset pin number]\n"
++);
++
++U_BOOT_CMD(
++	lcdsleep,	1,	1,	do_lcd_sleep,
++	"Switch LCD to its sleep mode",
++	"lcdsleep \n"
++);
++
++U_BOOT_CMD(
++	lcdawake,	1,	1,	do_lcd_awake,
++	"Switch LCD to its awake mode",
++	"lcdwake \n"
++);
++
++U_BOOT_CMD(
++	lcdregget, 2,	1,	do_lcd_reg_get,
++	"reads LCD controller's register",
++	"<reg_number> - Read <reg_number> value from LCD controller\n"
++	"<reg_number> - Hexadecimal string with the register number (requires a 2 figures number)\n"
++);
++
++U_BOOT_CMD(
++	lcdregset,	3,	1,	do_lcd_reg_set,
++	"writes LCD controller's register",
++	"<reg_number> <data> - Write <data> to <reg_number> on LCD controller\n"
++	"<reg_number> - Hexadecimal string with the register number (requires a 2 figures number)\n"
++	"<data>     - Hexadecimal string that gets sent"
++);
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/lcd_commands.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/lcd_commands.h	2011-05-10 13:41:39.291924421 -0600
+@@ -0,0 +1,42 @@
++/*
++ * lcd_commands.h
++ *
++ * This file defines the basic functions, used by the command, that must
++ * be included in every lcd_driver to enable it's functionallity.
++ *
++ * Original Author:
++ *     Natanael Castro <natanael.castro@ridgerun.com>
++ *
++ * Copyright (C) 2011 RidgeRun - http://www.ridgerun.com/
++ *
++ */
++
++/*******************************************
++ Routine: lcd_drv_reg_get
++ Description:  routine for reading the values of a LCD controller's register
++*******************************************/
++int lcd_drv_reg_get(char *argv[]);
++
++/*******************************************
++ Routine: lcd_drv_reg_set
++ Description:  routine for setting the values of a LCD controller's register
++*******************************************/
++int lcd_drv_reg_set(int argc, char *argv[]);
++
++/*******************************************
++ Routine: lcd_drv_init
++ Description:  routine for initializing the LCD, requires its GPIO reset line
++*******************************************/
++int lcd_drv_init (int lcd_reset_gpio);
++
++/*******************************************
++ Routine: lcd_drv_awake
++ Description:  routine for setting the LCD to its "awake" mode
++*******************************************/
++int lcd_drv_awake(void);
++
++/*******************************************
++ Routine: lcd_drv_sleep
++ Description:  routine for setting the LCD to its "sleep" mode
++*******************************************/
++int lcd_drv_sleep(void);

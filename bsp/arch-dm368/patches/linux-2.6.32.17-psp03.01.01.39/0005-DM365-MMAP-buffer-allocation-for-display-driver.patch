@@ -1,0 +1,27 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_display.c
+===================================================================
+--- kernel.orig/linux-2.6.32/drivers/media/video/davinci/davinci_display.c	2011-02-22 15:17:07.348172166 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_display.c	2011-02-22 15:17:34.540167236 -0600
+@@ -46,10 +46,10 @@
+ 
+ static u32 video2_numbuffers = 3;
+ static u32 video3_numbuffers = 3;
+-static u32 cont2_bufoffset;
+-static u32 cont2_bufsize;
+-static u32 cont3_bufoffset;
+-static u32 cont3_bufsize;
++static u32 cont2_bufoffset = 0;
++static u32 cont2_bufsize = 0;
++static u32 cont3_bufoffset = 0;
++static u32 cont3_bufsize = 0;
+ 
+ #define DAVINCI_DISPLAY_HD_BUF_SIZE (1280*720*2)
+ #define DAVINCI_DISPLAY_SD_BUF_SIZE (720*576*2)
+@@ -72,6 +72,7 @@
+ MODULE_PARM_DESC(cont3_bufoffset, "Display offset (default 0)");
+ MODULE_PARM_DESC(cont3_bufsize, "Display buffer size (default 0)");
+ 
++
+ #define DAVINCI_DEFAULT_NUM_BUFS 3
+ static struct buf_config_params display_buf_config_params = {
+ 	.min_numbuffers = DAVINCI_DEFAULT_NUM_BUFS,

@@ -1,0 +1,744 @@
+Index: gst-dmai-plugins/src/src/gsttidmairesizer.c
+===================================================================
+--- gst-dmai-plugins.orig/src/src/gsttidmairesizer.c
++++ gst-dmai-plugins/src/src/gsttidmairesizer.c
+@@ -30,7 +30,8 @@
+ #include "gsttidmaibuffertransport.h"
+ #include "gsttidmairesizer.h"
+ 
+-GST_DEBUG_CATEGORY_STATIC (gst_tidmairesizer_debug);
++
++GST_DEBUG_CATEGORY (gst_tidmairesizer_debug);
+ #define GST_CAT_DEFAULT gst_tidmairesizer_debug
+ 
+ #ifdef GLIB_2_31_AND_UP  
+@@ -73,7 +74,7 @@
+     GST_PAD_ALWAYS,
+     GST_STATIC_CAPS (GST_VIDEO_CAPS_YUV ("UYVY")";"
+ #if PLATFORM == dm365
+-    GST_VIDEO_CAPS_YUV ("NV12")
++    GST_VIDEO_CAPS_YUV ("NV12")";"
+ #endif
+     ));
+ 
+@@ -81,7 +82,14 @@
+ GST_STATIC_PAD_TEMPLATE ("sink",
+     GST_PAD_SINK,
+     GST_PAD_ALWAYS,
+-    GST_STATIC_CAPS (GST_VIDEO_CAPS_YUV ("UYVY")", pixel-aspect-ratio=(fraction) [0/1, MAX ]"));
++    GST_STATIC_CAPS (GST_VIDEO_CAPS_YUV ("UYVY")", pixel-aspect-ratio=(fraction) [0/1, MAX ];"
++#if PLATFORM == dm365
++    "video/x-raw-bayer, "                                           \
++    "width = " GST_VIDEO_SIZE_RANGE ", "                            \
++    "height = " GST_VIDEO_SIZE_RANGE ", "                           \
++    "framerate = " GST_VIDEO_FPS_RANGE
++#endif
++    ));
+ 
+ static void gst_dmai_resizer_set_property (GObject * object,
+     guint prop_id, const GValue * value, GParamSpec * pspec);
+@@ -434,6 +442,7 @@
+   dmairesizer->colorSpace = ColorSpace_NOTSET;
+   dmairesizer->outColorSpace = ColorSpace_NOTSET;
+   dmairesizer->configured = FALSE;
++  dmairesizer->isBayer = FALSE;
+ 
+ #if PLATFORM == dm6467
+   dmairesizer->numOutBuf = 5;
+@@ -664,24 +673,31 @@
+     }
+   }
+ 
+-  if (gst_structure_get_fourcc(structure, "format", &fourcc)) {
+-      switch (fourcc) {
+-          case GST_MAKE_FOURCC('U', 'Y', 'V', 'Y'):
+-              dmairesizer->colorSpace = ColorSpace_UYVY;
+-              break;
+-          case GST_MAKE_FOURCC('Y', '8', 'C', '8'):
+-              dmairesizer->colorSpace = ColorSpace_YUV422PSEMI;
+-              break;
+-          case GST_MAKE_FOURCC('N', 'V', '1', '2'):
+-              dmairesizer->colorSpace = ColorSpace_YUV420PSEMI;
+-              break;
+-          default:
+-              GST_ELEMENT_ERROR(dmairesizer, STREAM, NOT_IMPLEMENTED,
+-                  ("unsupported input fourcc in video/image stream\n"), (NULL));
+-                  gst_object_unref(dmairesizer);
+-              return FALSE;
+-      }
++  if (gst_structure_has_name (structure, "video/x-raw-yuv")) {
++    dmairesizer->isBayer = FALSE;
++    if (gst_structure_get_fourcc(structure, "format", &fourcc)) {
++        switch (fourcc) {
++            case GST_MAKE_FOURCC('U', 'Y', 'V', 'Y'):
++                dmairesizer->colorSpace = ColorSpace_UYVY;
++                break;
++            case GST_MAKE_FOURCC('Y', '8', 'C', '8'):
++                dmairesizer->colorSpace = ColorSpace_YUV422PSEMI;
++                break;
++            case GST_MAKE_FOURCC('N', 'V', '1', '2'):
++                dmairesizer->colorSpace = ColorSpace_YUV420PSEMI;
++                break;
++            default:
++                GST_ELEMENT_ERROR(dmairesizer, STREAM, NOT_IMPLEMENTED,
++                    ("unsupported input fourcc in video/image stream\n"), (NULL));
++                    gst_object_unref(dmairesizer);
++                return FALSE;
++        }
++    }
++  } else  if (gst_structure_has_name (structure, "video/x-raw-bayer")) {
++    dmairesizer->isBayer = TRUE;
++    dmairesizer->colorSpace = ColorSpace_UYVY;
+   }
++
+   dmairesizer->inBufSize = 0;
+ 
+   othercaps = gst_pad_get_allowed_caps (dmairesizer->srcpad);
+@@ -814,7 +830,6 @@
+   }
+ 
+   IDBuf = Buffer_getId(DstBuf);
+-
+   /* If a property change, we need to cleanup our render buffers */
+   if(dmairesizer->flagToClean[IDBuf]){
+       dmairesizer->dim[IDBuf].width = dmairesizer->target_width;
+@@ -886,7 +901,6 @@
+                   dmairesizer->dim[IDBuf].width -= dmairesizer->cropWEnd;
+               }
+           }
+-
+           dmairesizer->dim[IDBuf].y += allocDim.y;
+           /* If the display buffer is on negative location */
+           if (dmairesizer->dim[IDBuf].y < 0){
+@@ -942,7 +956,6 @@
+               srcDim.height = 0;
+           }
+       }
+-
+       /* Check if we need to crop at the end*/
+       if (dmairesizer->cropWEnd && dmairesizer->precropped_width){
+           gint crop = srcDim.width * dmairesizer->cropWEnd / dmairesizer->precropped_width;
+@@ -966,27 +979,72 @@
+ 
+   if (!dmairesizer->configured) {
+     /* Configure resizer */
+-    GST_LOG ("configuring resize\n");
+-    if (Resize_config (dmairesizer->Resizer, inBuf, DstBuf) < 0) {
++    BufferGfx_getDimensions(inBuf, &srcDim);
++    GST_INFO ("configuring resize %li %d\n", srcDim.lineLength, BufferGfx_getColorSpace(inBuf));
++    BufferGfx_setColorSpace(inBuf,dmairesizer->colorSpace);
++
++    if (Resize_config (dmairesizer->Resizer, inBuf, DstBuf, dmairesizer->isBayer) < 0) {
+       GST_ELEMENT_ERROR (dmairesizer, STREAM, ENCODE, (NULL),
+-         ("Failed to configure the resizer"));
++        ("Failed to configure the resizer"));
+       return NULL;
+     }
++
++
++    if (dmairesizer->isBayer){
++      if (!previewer_config_bayer(dmairesizer->preview_fd, srcDim.width, srcDim.height, srcDim.lineLength)){
++        GST_ELEMENT_ERROR (dmairesizer, STREAM, ENCODE, (NULL),
++          ("Failed to configure the previewer"));
++        return NULL;
++      }
++      /* Calculate previewer and resizer configuration parameters.
++       * If the input image is bigger than 2176, the resizer must be called twice,
++       * this function calculates the parameters for the two passes,
++       * if not just for one pass*/
++      calculate_normal_f_div_param(dmairesizer->width,
++          dmairesizer->target_width, &dmairesizer->f_div);
++    }
+     dmairesizer->configured = TRUE;
+   }
+ 
+   /* Execute resizer */
+   if (dmairesizer->downstreamBuffers){  
+-      GST_DEBUG ("executing resizer: %d,%d@%d,%d --> %d,%d@%d,%d\n",
+-        (int)srcDim.width,(int)srcDim.height,(int)srcDim.x,(int)srcDim.y,
+-        (int)allocDim.width,(int)allocDim.height,(int)allocDim.x,(int)allocDim.y);
++    GST_DEBUG ("executing resizer: %d,%d@%d,%d --> %d,%d@%d,%d\n",
++      (int)srcDim.width,(int)srcDim.height,(int)srcDim.x,(int)srcDim.y,
++      (int)allocDim.width,(int)allocDim.height,(int)allocDim.x,(int)allocDim.y);
+   } else {
+-      GST_DEBUG ("executing resizer");
++    GST_DEBUG ("executing resizer");
+   }
+-  if (Resize_execute (dmairesizer->Resizer, inBuf, DstBuf) < 0) {
+-    GST_ELEMENT_ERROR (dmairesizer, STREAM, ENCODE, (NULL),
+-        ("Failed executing the resizer"));
+-    return NULL;
++
++  if (dmairesizer->isBayer){
++    /* Configure and execute the ipipe. If the image width is shorter than
++     * 2176 the ipipe is executed just one time else the ipipe is
++     * is executed twice
++     **/
++    gint i;
++    for(i=0; i < dmairesizer->f_div.num_passes; i++){
++      if (!frame_div_config(*(gint *)(dmairesizer->Resizer), dmairesizer->preview_fd,
++          &dmairesizer->f_div.pass[i],  dmairesizer->lineLength,
++          dmairesizer->f_div.rsz_ratio)) {
++
++        GST_ELEMENT_ERROR (dmairesizer, RESOURCE, SETTINGS, (NULL),
++           ("Failed getting configuration for resizer pass %d", i));
++
++      }
++
++      if (previewer_execute (dmairesizer->preview_fd, inBuf,
++          DstBuf, i*(dmairesizer->f_div.pass[0].o_hsz + 1), dmairesizer->f_div.pass[i].src_hps) < 0) {
++
++        GST_ELEMENT_ERROR (dmairesizer, STREAM, ENCODE, (NULL),
++          ("Failed executing the preview"));
++        return NULL;
++      }
++    }
++  } else {
++    if (Resize_execute (dmairesizer->Resizer, inBuf, DstBuf) < 0) {
++      GST_ELEMENT_ERROR (dmairesizer, STREAM, ENCODE, (NULL),
++          ("Failed executing the resizer"));
++      return NULL;
++    }
+   }
+ 
+   if (dmairesizer->downstreamBuffers){
+@@ -1040,10 +1098,15 @@
+       gfxAttrs.dim.height = dmairesizer->source_height;
+       gfxAttrs.dim.x = 0;
+       gfxAttrs.dim.y = 0;
+-      gfxAttrs.colorSpace = dmairesizer->colorSpace;
++
++      if (!dmairesizer->isBayer)
++          gfxAttrs.colorSpace = dmairesizer->colorSpace;
++      else
++          gfxAttrs.colorSpace = ColorSpace_GRAY;
++
+       gfxAttrs.dim.lineLength =
+           BufferGfx_calcLineLength (dmairesizer->width,
+-          dmairesizer->colorSpace);
++          gfxAttrs.colorSpace);
+       hBuf = Buffer_create (dmairesizer->inBufSize, &gfxAttrs.bAttrs);
+       Buffer_setUserPtr (hBuf,
+           Buffer_getUserPtr (GST_TIDMAIBUFFERTRANSPORT_DMAIBUF (buf)));
+@@ -1187,7 +1250,7 @@
+ 
+   GMUTEX_UNLOCK (dmairesizer->mutex);
+ 
+-  GST_WARNING("Pushing buffer %p\n",pushBuffer);
++  GST_WARNING("Pushing buffer %p",pushBuffer);
+ 
+   if (gst_pad_push (dmairesizer->srcpad, pushBuffer) != GST_FLOW_OK) {
+     if(!dmairesizer->flushing){
+@@ -1254,6 +1317,7 @@
+         GST_DEBUG("Goint to Ready state from NULL");
+         Resize_Attrs rszAttrs = Resize_Attrs_DEFAULT;
+         dmairesizer->Resizer = Resize_create (&rszAttrs);
++        dmairesizer->preview_fd = previewer_create_ss();
+         if (!dmairesizer->Resizer){
+             GST_ELEMENT_ERROR (dmairesizer, STREAM, ENCODE, (NULL), ("Failed to create resizer"));
+             return GST_STATE_CHANGE_FAILURE;
+@@ -1287,6 +1351,11 @@
+           Resize_delete(dmairesizer->Resizer);
+           dmairesizer->Resizer = NULL;
+         }
++
++        if (dmairesizer->preview_fd > 0) {
++            previewer_close(dmairesizer->preview_fd);
++            dmairesizer->preview_fd = -1;
++        }
+         break;
+     default:
+         break;
+Index: gst-dmai-plugins/src/src/dm36x_ipipe.c
+===================================================================
+--- /dev/null
++++ gst-dmai-plugins/src/src/dm36x_ipipe.c
+@@ -0,0 +1,394 @@
++/*
++ * Copyright (C) 2012 RidgeRun, LLC (http://www.ridgerun.com)
++ */
++
++#include <gst/gst.h>
++#include <sys/ioctl.h>
++#include <fcntl.h>
++#include <unistd.h>
++#include <string.h>
++
++#include <media/davinci/imp_previewer.h>
++#include <media/davinci/imp_resizer.h>
++#include <media/davinci/dm365_ipipe.h>
++
++#include "dm36x_ipipe.h"
++
++#define PREVIEWER_DEVICE "/dev/davinci_previewer"
++#define RESIZER_DEVICE "/dev/davinci_resizer"
++
++GST_DEBUG_CATEGORY_EXTERN (gst_tidmairesizer_debug);
++#define GST_CAT_DEFAULT gst_tidmairesizer_debug
++
++/*
++ * previewer_create
++ *
++ * Open the davinci previewer device and set it to
++ * single shot mode.
++ */
++gint previewer_create_ss()
++{
++  gint prev_fd;
++  guint oper_mode= IMP_MODE_SINGLE_SHOT;
++
++  GST_DEBUG("Open device %s", PREVIEWER_DEVICE);
++  /* Open previewer device */
++  prev_fd = open(PREVIEWER_DEVICE, O_RDWR);
++  if (prev_fd == -1) {
++    GST_ERROR("Failed to open %s\n", PREVIEWER_DEVICE);
++    goto error;
++  }
++
++  if (ioctl(prev_fd,PREV_S_OPER_MODE, &oper_mode) < 0) {
++    GST_ERROR("Previewer can't set operation mode\n");
++    goto error;
++  }
++
++  if (ioctl(prev_fd,PREV_G_OPER_MODE, &oper_mode) < 0) {
++    GST_ERROR("Previewer can't get operation mode\n");
++    goto error;
++  }
++
++  if (oper_mode != IMP_MODE_SINGLE_SHOT) {
++    GST_ERROR("Previewer can't set operation mode single shot, the mode is %d\n",
++      oper_mode);
++    goto error;
++  }
++
++  GST_DEBUG("Previewer operating mode changed successfully to single shot");
++  return prev_fd;
++
++error:
++  /* close the device if there was an error */
++  if (prev_fd > 0) {
++    close (prev_fd);
++    prev_fd = -1;
++  }
++  return FALSE;
++}
++
++/*
++ * previewer_config
++ *
++ * Configure the previewer to receive buffers from SDRAM in
++ * bayer format.
++ */
++gboolean previewer_config_bayer(gint prev_fd, guint width, guint height, guint line_length)
++{
++  struct prev_channel_config prev_chan_config;
++  struct prev_single_shot_config prev_ss_config;
++  guint oper_mode= IMP_MODE_SINGLE_SHOT;
++
++  GST_DEBUG("Configuring preview");
++  /* make sure the previewer has been opened */
++  if (prev_fd < 0) {
++    GST_ERROR("Device '%s' is not open.", PREVIEWER_DEVICE);
++    goto error;
++  }
++
++  GST_DEBUG("Initialize previewer driver with default configuration\n");
++  memset(&prev_chan_config, 0, sizeof(prev_chan_config));
++  prev_chan_config.oper_mode = oper_mode;
++  prev_chan_config.len       = 0;
++  prev_chan_config.config    = NULL;
++
++  if (ioctl(prev_fd, PREV_S_CONFIG, &prev_chan_config) < 0){
++    GST_ERROR("Error in setting default configuration on previewer.");
++    goto error;
++  }
++
++  GST_DEBUG("Default previewer configuration setting successfull\n");
++  prev_chan_config.oper_mode = oper_mode;
++  prev_chan_config.len = sizeof(struct prev_single_shot_config);
++  prev_chan_config.config = &prev_ss_config;
++
++  if (ioctl(prev_fd, PREV_G_CONFIG, &prev_chan_config) < 0) {
++    GST_ERROR("Error in getting configuration from driver\n");
++    goto error;
++  }
++
++  GST_DEBUG("Configure previewer driver to receive sdram bayer format\n");
++  prev_chan_config.oper_mode = oper_mode;
++  prev_chan_config.len = sizeof(struct prev_single_shot_config);
++  prev_chan_config.config = &prev_ss_config;
++
++  prev_ss_config.input.hnum = width;
++  prev_ss_config.input.image_width = width;
++  prev_ss_config.input.image_height = height;
++  prev_ss_config.input.line_length = line_length;
++  prev_ss_config.input.vst = 1;
++  prev_ss_config.input.hst = 0;
++  prev_ss_config.input.ppln= width;
++  prev_ss_config.input.lpfr = height + 10;
++  prev_ss_config.input.pix_fmt = IPIPE_BAYER_8BIT_PACK_ALAW;
++  prev_ss_config.input.colp_olop = IPIPE_GREEN_RED;
++  prev_ss_config.input.colp_olep = IPIPE_RED;
++  prev_ss_config.input.colp_elop = IPIPE_BLUE;
++  prev_ss_config.input.colp_elep = IPIPE_GREEN_BLUE;
++  prev_ss_config.input.data_shift = IPIPEIF_5_1_BITS9_0;
++
++  if (ioctl(prev_fd, PREV_S_CONFIG, &prev_chan_config) < 0) {
++    GST_ERROR("Error in setting preview custom configuration\n");
++    goto error;
++  }
++
++  return TRUE;
++error:
++  GST_ERROR ("Failed previewer configuration");
++  return FALSE;
++}
++
++/*
++ * previewer_execute
++ *
++ * Run the previewer procesing for one given buffer
++ */
++gboolean previewer_execute(gint prev_fd,
++                   Buffer_Handle src_buf, Buffer_Handle dst_buf,
++                   gint dst_horz_offset, gint src_horz_offset)
++{
++
++  struct imp_convert  prev;
++  BufferGfx_Dimensions src_dim;
++  BufferGfx_Dimensions dst_dim;
++  ColorSpace_Type out_colorspace;
++  guint src_offset;
++  guint dst_offset;
++  guint bytes_pixel;
++
++  /*Verifying input variables*/
++  assert(src_buf);
++  assert(dst_buf);
++
++  BufferGfx_getDimensions(src_buf, &src_dim);
++  BufferGfx_getDimensions(dst_buf, &dst_dim);
++
++  out_colorspace = BufferGfx_getColorSpace(dst_buf);
++
++  /*For UYVY each pixel has two bytes, other
++   *formats have one byte per pixel*/
++  if (out_colorspace == ColorSpace_UYVY)
++    bytes_pixel = 1;
++  else
++    bytes_pixel = 0;
++
++  src_offset = src_dim.y * src_dim.lineLength + src_dim.x +
++            src_horz_offset;
++  dst_offset = dst_dim.y * dst_dim.lineLength +
++            ((dst_dim.x + dst_horz_offset) << bytes_pixel);
++  GST_DEBUG("Configuring buffers src offset %d, dst offset %d",
++    src_offset, dst_offset);
++
++  bzero(&prev,sizeof(prev));
++  prev.in_buff.index = -1;
++  prev.in_buff.buf_type = IMP_BUF_IN;
++  prev.in_buff.offset = (UInt32) Buffer_getUserPtr(src_buf) + src_offset;
++  prev.in_buff.size = Buffer_getSize(src_buf);
++
++  prev.out_buff1.index = -1;
++  prev.out_buff1.buf_type = IMP_BUF_OUT1;
++  prev.out_buff1.offset = (UInt32) Buffer_getUserPtr(dst_buf) + dst_offset;
++  prev.out_buff1.size = Buffer_getSize(dst_buf);
++
++  /* Start IPIPE operation */
++  if (ioctl(prev_fd, PREV_PREVIEW, &prev) == -1) {
++    GST_ERROR("Failed doing preview\n");
++    return FALSE;
++  }
++
++  Buffer_setNumBytesUsed(dst_buf, Buffer_getNumBytesUsed(src_buf));
++  return TRUE;
++}
++
++gboolean previewer_close(gint prev_fd)
++{
++  if (prev_fd > 0) {
++    if (!close(prev_fd))
++      GST_DEBUG("Previewer closed successfully\n");
++    else
++      GST_ERROR("Error closing previewer\n");
++  }
++  return TRUE;
++}
++
++/* Calculate_normal_f_div_param.
++ * (Taken from kernel 2.6.32 driver dm365_ipipe.c)
++ *
++ * Algorithm to calculate the frame division parameters for resizer.
++ * in normal mode. Please refer the application note in DM360 functional
++ * spec for details of the algorithm. Just use the algorithm
++ * if input width is greater than 2176.
++ */
++gboolean calculate_normal_f_div_param(gint input_width,
++          gint output_width, struct f_div_param *f_div)
++{
++  /* rsz = R, input_width = H, output width = h in the equation */
++  guint rsz, temp, temp1, o, h1, h2;
++
++  /*If the input width is greater than the ipipe single pass limit,
++   *calculate frame division parameters, to use resizer multi-pass*/
++  if (input_width > 2176) {
++
++    if (output_width > input_width) {
++      GST_ERROR("frame div mode is used for scale down only\n");
++      goto error;
++    }
++    rsz = (input_width << 8) / output_width;
++    temp = rsz << 1;
++    /* temp1 = (H * 256) / (2 * R) + 1 */
++    temp1 = ((input_width << 8) / temp) + 1;
++    o = 14;
++    if (!(temp1 % 2)) {
++      h1 = temp1;
++    } else {
++      /* h1 = 2 * [(256 * H/2 - R/2) * 1/2R ] + 2 */
++      temp1 = (input_width << 7);
++      temp1 -= (rsz >> 1);
++      temp1 /= (rsz << 1);
++      temp1 <<= 1;
++      temp1 += 2;
++      /* o = 10 + 4 + 2 * ceil(R/1024) */
++      o += ((CEIL(rsz, 1024)) << 1);
++      h1 = temp1;
++    }
++    GST_DEBUG("Frame division: R = %d, h1 = %d, o = %d", rsz, h1, o);
++    /* Ensure an offset multiple of 32 bits */
++    temp = (input_width >> 1) + o;
++    if (temp % 32){
++      temp = (temp + 31) & ~31;
++      o = temp -  (input_width >> 1);
++			GST_DEBUG("Adjusted Frame division o = %d", o);
++    }
++
++
++    h2 = output_width - h1;
++    /* phi */
++    temp = (h1 * rsz) - (((input_width >> 1) - o) << 8);
++    /* skip */
++    temp1 = ((temp - 1024) >> 9) << 1;
++
++    f_div->num_passes = 2;
++    f_div->pass[0].o_hsz = h1 - 1;
++    f_div->pass[0].i_hps = 0;
++    f_div->pass[0].h_phs = 0;
++    f_div->pass[0].src_hps = 0;
++    f_div->pass[0].src_hsz = (input_width >> 1) + o;
++    GST_DEBUG("Resizer first pass: o_hsz = %d, i_hps = %d, h_phs= %d, "
++      " src_hps = %d, src_hsz = %d", f_div->pass[0].o_hsz,
++      f_div->pass[0].i_hps, f_div->pass[0].h_phs, f_div->pass[0].src_hps,
++      f_div->pass[0].src_hsz);
++
++    f_div->pass[1].o_hsz = h2 - 1;
++    f_div->pass[1].i_hps = temp1;
++    f_div->pass[1].h_phs = (temp - (temp1 << 8));
++    f_div->pass[1].src_hps = (input_width >> 1) - o;
++    f_div->pass[1].src_hsz = (input_width >> 1) + o;
++    GST_DEBUG("Resizer second pass: o_hsz = %d, i_hps = %d, h_phs= %d, "
++      " src_hps = %d, src_hsz = %d", f_div->pass[1].o_hsz,
++      f_div->pass[1].i_hps, f_div->pass[1].h_phs, f_div->pass[1].src_hps,
++      f_div->pass[1].src_hsz);
++
++    /*Define resizer ratio that must be used by the resizer to meet
++     *the algorithm calculations and get the wide image correctly*/
++    f_div->rsz_ratio = rsz;
++  } else{
++    f_div->num_passes = 1;
++    f_div->pass[0].o_hsz = output_width;
++    f_div->pass[0].i_hps = 0;
++    f_div->pass[0].h_phs = 0;
++    f_div->pass[0].src_hps = 0;
++    f_div->pass[0].src_hsz = input_width;
++    f_div->rsz_ratio = 0;
++  }
++  return TRUE;
++
++error:
++  return FALSE;
++}
++
++/*
++ * frame_div_config
++ *
++ * Configures resizer and previewer with the data provided in
++ * f_div. Use this function when you what to configure one
++ * pass of previewer/resizer specialy in frame division mode.
++ */
++
++gboolean frame_div_config(gint rsz_fd, gint prev_fd, struct f_div_pass *f_div,
++  guint out_length, guint rsz_ratio)
++{
++  struct rsz_channel_config rsz_chan_config;
++  struct rsz_single_shot_config rsz_ss_config;
++  struct prev_channel_config prev_chan_config;
++  struct prev_single_shot_config prev_ss_config;
++
++  guint oper_mode= IMP_MODE_SINGLE_SHOT;
++
++  GST_DEBUG("Configuring frame division pass");
++  /* make sure the previewer and the resizer has been opened */
++  if (rsz_fd < 0) {
++    GST_ERROR("Device '%s' is not open.", RESIZER_DEVICE);
++    goto error;
++  }
++  if (prev_fd < 0) {
++    GST_ERROR("Device '%s' is not open.", PREVIEWER_DEVICE);
++    goto error;
++  }
++
++  bzero(&rsz_chan_config,sizeof(rsz_chan_config));
++  rsz_chan_config.oper_mode = oper_mode;
++  rsz_chan_config.chain = 1;
++  rsz_chan_config.len = sizeof(struct rsz_single_shot_config);
++  rsz_chan_config.config = &rsz_ss_config;
++
++  if (ioctl(rsz_fd, RSZ_G_CONFIG, &rsz_chan_config) < 0) {
++    GST_ERROR("Error in getting configuration from driver\n");
++    goto error;
++  }
++
++  /*Define frame division parameters*/
++  rsz_ss_config.input.image_width = f_div->src_hsz;
++  rsz_ss_config.input.hst = f_div->src_hps;
++  rsz_ss_config.input.i_hps = f_div->i_hps;
++  rsz_ss_config.input.h_phs = f_div->h_phs;
++  rsz_ss_config.output1.width = f_div->o_hsz;
++  rsz_ss_config.output1.line_length = out_length;
++
++  GST_DEBUG("Configuring resizer input: width = %d, line length = %d"
++    "hst = %d, i_hps = %d, h_phs = %d", rsz_ss_config.input.image_width,
++    rsz_ss_config.input.line_length, rsz_ss_config.input.hst,
++    rsz_ss_config.input.i_hps, rsz_ss_config.input.h_phs);
++
++  GST_DEBUG("Configuring resizer output: width = %d line length = %d",
++    rsz_ss_config.output1.width, rsz_ss_config.output1.line_length);
++
++  if (ioctl(rsz_fd, RSZ_S_CONFIG, &rsz_chan_config) < 0) {
++    GST_ERROR("Error in setting preview custom configuration\n");
++    goto error;
++  }
++
++  prev_chan_config.oper_mode = oper_mode;
++  prev_chan_config.len = sizeof(struct prev_single_shot_config);
++  prev_chan_config.config = &prev_ss_config;
++
++  if (ioctl(prev_fd, PREV_G_CONFIG, &prev_chan_config) < 0) {
++    GST_ERROR("Error in getting configuration from driver\n");
++    goto error;
++  }
++
++  prev_ss_config.input.image_width = f_div->src_hsz;
++  prev_ss_config.input.hnum = f_div->src_hsz;
++  prev_ss_config.input.ppln= f_div->src_hsz;
++  prev_ss_config.input.rsz_ratio = rsz_ratio;
++  GST_DEBUG("Configuring previewer output: width = %d line length = %d",
++    prev_ss_config.input.image_width, prev_ss_config.input.hst);
++
++  if (ioctl(prev_fd, PREV_S_CONFIG, &prev_chan_config) < 0) {
++    GST_ERROR("Error in setting preview custom configuration\n");
++    goto error;
++  }
++  return TRUE;
++error:
++  GST_ERROR ("Failed frame division configuration");
++  return FALSE;
++}
+Index: gst-dmai-plugins/src/src/dm36x_ipipe.h
+===================================================================
+--- /dev/null
++++ gst-dmai-plugins/src/src/dm36x_ipipe.h
+@@ -0,0 +1,35 @@
++#ifndef __DM36X_IPIPE_H__
++#define __DM36X_IPIPE_H__
++
++#include <glib.h>
++#include <ti/sdo/dmai/Dmai.h>
++#include <ti/sdo/dmai/BufferGfx.h>
++
++#define CEIL(a, b)  (((a) + (b-1)) / (b))
++#define IPIPE_MAX_PASSES  2
++
++struct f_div_pass {
++  unsigned int o_hsz;
++  unsigned int i_hps;
++  unsigned int h_phs;
++  unsigned int src_hps;
++  unsigned int src_hsz;
++};
++
++struct f_div_param {
++  unsigned int num_passes;
++  unsigned int rsz_ratio;
++  struct f_div_pass pass[IPIPE_MAX_PASSES];
++};
++
++gint previewer_create_ss();
++gboolean previewer_config_bayer(gint prev_fd, guint width, guint height,  guint line_length);
++gboolean previewer_execute(gint prev_fd,
++  Buffer_Handle src_buf, Buffer_Handle dst_buf, gint dst_horz_offset,
++  gint src_horz_offset);
++gboolean previewer_close(gint prev_fd);
++gboolean calculate_normal_f_div_param(gint input_width, gint output_width,
++  struct f_div_param *f_div);
++gboolean frame_div_config(gint rsz_fd, gint prev_fd, struct f_div_pass *f_div,
++  guint out_length, guint rsz_ratio);
++#endif /* __DM36X_IPIPE__ */
+Index: gst-dmai-plugins/src/src/gsttidmairesizer.h
+===================================================================
+--- gst-dmai-plugins.orig/src/src/gsttidmairesizer.h
++++ gst-dmai-plugins/src/src/gsttidmairesizer.h
+@@ -36,7 +36,7 @@
+ #include <ti/sdo/dmai/BufTab.h>
+ #include <ti/sdo/dmai/Resize.h>
+ #include "gsttidmaibuffertransport.h"
+-
++#include "dm36x_ipipe.h"
+ G_BEGIN_DECLS
+ #define GST_TYPE_DMAI_RESIZER             (gst_dmai_resizer_get_type())
+ #define GST_DMAI_RESIZER(obj)             (G_TYPE_CHECK_INSTANCE_CAST((obj), GST_TYPE_DMAI_RESIZER, GstTIDmaiResizer))
+@@ -68,7 +68,7 @@
+   gboolean clean_bufTab;
+   BufferGfx_Dimensions *dim;
+   gboolean *flagToClean;
+-
++  gboolean isBayer;
+   /*Buffers */
+   BufTab_Handle outBufTab;
+   gint outBufWidth;
+@@ -110,6 +110,9 @@
+  
+   /*Resizer */
+   Resize_Handle Resizer;
++  struct f_div_param f_div;
++  /*Preview*/
++  int preview_fd;
+ 
+ };
+ 
+Index: gst-dmai-plugins/src/src/Makefile.am
+===================================================================
+--- gst-dmai-plugins.orig/src/src/Makefile.am
++++ gst-dmai-plugins/src/src/Makefile.am
+@@ -4,7 +4,7 @@
+ # sources used to compile this plug-in
+ libgstticodecplugin_la_SOURCES = gstticodecplugin.c gsttidmaibuffertransport.c \
+ gsttidmaivideosink.c gsttidmaidec.c gsttidmaienc.c gsttidmaiaccel.c gsttipriority.c \
+-gsttividdec2.c gsttividdec.c gsttividenc1.c gsttividenc.c gsttidmairesizer.c \
++gsttividdec2.c gsttividdec.c gsttividenc1.c gsttividenc.c gsttidmairesizer.c dm36x_ipipe.c \
+ gsttisupport_generic.c gsttisupport_mpeg4.c gsttisupport_h264.c gsttisupport_jpeg.c \
+ gsttisupport_mpeg2.c \
+ gsttiauddec1.c gsttiauddec.c gsttiaudenc1.c gsttiaudenc.c gsttiimgenc1.c gsttiimgenc.c \
+@@ -33,7 +33,7 @@
+ gsttisupport_wma.h gsttisupport_jpeg.h ti_encoders.h ti_decoders.h caps.h gsttidmaidec.h \
+ gsttidmaienc.h gsttidmaiaccel.h gsttipriority.h ittiam_encoders.h ittiam_caps.h \
+ gsttidmaibasedualencoder.h gsttidmaibasevideodualencoder.h \
+-gsttidmaih264dualencoder.h gsttidmaividenc1.h \
++gsttidmaih264dualencoder.h gsttidmaividenc1.h dm36x_ipipe.h \
+ gsttidmaivideoutils.h
+ 
+ # XDC Configuration

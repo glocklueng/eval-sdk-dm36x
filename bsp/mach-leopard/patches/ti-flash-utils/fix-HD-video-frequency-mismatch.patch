@@ -1,0 +1,51 @@
+Index: ti-flash-utils/src/DM36x/Common/src/device.c
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/Common/src/device.c	2013-05-14 23:05:47.404396190 -0600
++++ ti-flash-utils/src/DM36x/Common/src/device.c	2013-05-14 23:07:26.759037911 -0600
+@@ -318,6 +318,46 @@
+ 
+ #define DDR_FREQ		 243
+ 
++#elif defined(PLL_SETTING_ARM445_DDR351_OSC24)
++
++static const Uint16 DDR_T_RP = 150;
++static const Uint16 DDR_T_RCD = 150;
++static const Uint16 DDR_T_RC = 550;
++
++#define PLL1_MUL		0x75 
++#define PLL1_PREDIV		0x7
++#define PLL1_POSTDIV		0x0 	// PLL1 24*2M/(N+1) = 702 Mhz
++
++#define PLL1_DIV1		0x1B	// POST DIV 702/28 = 25.1 Mhz -> USB PHY 
++#define PLL1_DIV2		0x1	// POST DIV 702/2  = 351  Mhz -> ARM926/ARM968
++#define PLL1_DIV3		0x1	// POST DIV 702/2  = 351  Mhz -> MJCP/HDVICP
++#define PLL1_DIV4		0x3	// POST DIV 702/4  = 175.5Mhz -> EDMA/Peripheral CFG0 (1/2 Kaleido clock)
++#define PLL1_DIV5		0x1	// POST DIV 702/2  = 351  Mhz -> VPSS (max 270)
++#define PLL1_DIV6		0x19	// POST DIV 702/26 = 27   Mhz -> VENC	
++#define PLL1_DIV7		0x0	// POST DIV 702/1 =  702  Mhz -> DDRx2
++#define PLL1_DIV8		0x6 	// POST DIV 702/7 =  100.3Mhz -> MMC0/SD0
++#define PLL1_DIV9		0x1B	// POST DIV 702/28 = 25.1 Mhz -> CLKOUT 
++
++#define PLL2_MUL		0xE8
++#define PLL2_PREDIV		0x18
++#define PLL2_POSTDIV		0x0 	// PLL2 24*2M/(N+1) = 445.44 Mhz
++
++/*
++ * MJL in order to get precise 74.25MHz video clock, up-adjusted the
++ * frequency slightly to 445.44MHz (+3.111% overclocked CPU).
++ * Note M is 10 bits and PREDIV 5 bits.
++ * Close ratios: 24*(2*232)/(24+1)=445.44 (-0.013%), 24*(2*65)/(6+1)=445.71 (+0.048%)
++ */
++#define PLL2_DIV1		0x11	// POST DIV 445.4/18 = 24.75 Mhz -> USB PHY
++#define PLL2_DIV2		0x0 	// POST DIV 445.4/1  = 445.4 Mhz -> ARM926/HDVICP 
++#define PLL2_DIV3		0x1	// POST DIV 445.4/2  = 222.7 Mhz -> DDRx2
++#define PLL2_DIV5		0x5 	// POST DIV 445.4/6  = 74.24 Mhz -> VENC
++#define PLL2_DIV4		0x16	// POST DIV 445.4/22 = 19.37 Mhz -> VOICE
++
++#define PERIPHERAL_CLK_CTRL_VAL	0x243F04FC
++
++#define DDR_FREQ		 351
++
+ #else
+ #error ERROR: unknown PLL configuration
+ #endif

@@ -1,0 +1,97 @@
+Index: ti-flash-utils/src/Common/ubl/src/ubl.c
+===================================================================
+--- ti-flash-utils.orig/src/Common/ubl/src/ubl.c	2013-05-14 14:26:48.471180201 -0600
++++ ti-flash-utils/src/Common/ubl/src/ubl.c	2013-05-14 14:27:05.634294173 -0600
+@@ -88,9 +88,9 @@
+   LOCAL_boot();
+     
+   // Jump to entry point
+-  DEBUG_printString("\r\nJumping to entry point at ");
+-  DEBUG_printHexInt(gEntryPoint);
+-  DEBUG_printString(".\r\n");
++//  DEBUG_printString("\r\nJumping to entry point at ");
++//  DEBUG_printHexInt(gEntryPoint);
++//  DEBUG_printString(".\r\n");
+   APPEntry = (void (*)(void)) gEntryPoint;
+   (*APPEntry)();  
+ 
+@@ -123,17 +123,17 @@
+   }
+   else
+   {
+-    DEBUG_printString(devString);
+-    DEBUG_printString(" initialization passed!\r\n");
++//    DEBUG_printString(devString);
++//    DEBUG_printString(" initialization passed!\r\n");
+   }
+ 
+   // Set RAM pointer to beginning of RAM space
+   UTIL_setCurrMemPtr(0);
+ 
+   // Send some information to host
+-  DEBUG_printString("TI UBL Version: ");
+-  DEBUG_printString(UBL_VERSION_STRING);
+-  DEBUG_printString("\r\nBooting Catalog Boot Loader\r\nBootMode = ");
++//  DEBUG_printString("TI UBL Version: ");
++//  DEBUG_printString(UBL_VERSION_STRING);
++//  DEBUG_printString("\r\nBooting Catalog Boot Loader\r\nBootMode = ");
+ 
+   DEBUG_printString("UBL " __DATE__ " " __TIME__ "\r\n");
+ 
+@@ -153,7 +153,7 @@
+ #elif defined(UBL_NOR)
+   {
+     //Report Bootmode to host
+-    DEBUG_printString("NOR \r\n");
++//    DEBUG_printString("NOR \r\n");
+ 
+     // Copy binary application image from NOR to RAM
+     if (NORBOOT_copy() != E_PASS)
+@@ -165,7 +165,7 @@
+ #elif defined(UBL_PCI)
+   {
+     //Report Bootmode to host
+-    DEBUG_printString("PCI \r\n");
++//    DEBUG_printString("PCI \r\n");
+ 
+     // Copy binary application image from PCI to RAM
+     if (PCIBOOT_copy() != E_PASS)
+@@ -177,7 +177,7 @@
+ #elif defined(UBL_SDMMC)
+   {
+     //Report Bootmode to host
+-    DEBUG_printString("SD/MMC \r\n");
++//    DEBUG_printString("SD/MMC Boot\r\n");
+ 
+     // Copy binary of application image from SD/MMC card to RAM
+     if (SDMMCBOOT_copy() != E_PASS)
+@@ -189,14 +189,14 @@
+ #else
+   {
+     //Report Bootmode to host
+-    DEBUG_printString("UART\r\n");
++    DEBUG_printString("Attempt UART boot as fallback\r\n");
+     UARTBOOT_copy();      
+   }
+ 
+ 
+ #endif
+     
+-  DEBUG_printString("   DONE");
++//  DEBUG_printString("   DONE");
+   
+   UTIL_waitLoop(10000);
+ 
+Index: ti-flash-utils/src/Common/ubl/src/sdmmcboot.c
+===================================================================
+--- ti-flash-utils.orig/src/Common/ubl/src/sdmmcboot.c	2013-05-14 14:26:48.471180201 -0600
++++ ti-flash-utils/src/Common/ubl/src/sdmmcboot.c	2013-05-14 14:26:48.519177722 -0600
+@@ -74,7 +74,7 @@
+ {
+   SDMMC_InfoHandle hSDMMCInfo;
+ 
+-  DEBUG_printString("Starting SDMMC Copy...\r\n");
++//  DEBUG_printString("Starting SDMMC Copy...\r\n");
+   
+   // SDMMC Initialization
+   hSDMMCInfo = SDMMC_open(0,NULL);

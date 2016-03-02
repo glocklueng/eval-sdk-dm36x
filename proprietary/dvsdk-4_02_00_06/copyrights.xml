@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<component>
+	<name>TI DVSDK</name>
+	<version>4.02.00.06</version>
+	<releaseDate></releaseDate>
+	<manufacturer>Texas Instruments</manufacturer>
+	<summary>A set of libraries and tools which support to create DSP based algorithms.</summary>
+	<link>http://www.ti.com/</link>
+	<issues>
+		<link><![CDATA[TODO]]></link>
+	</issues>
+	<license type="Private">
+		<link></link>
+		<text>
+			<![CDATA[TODO]]>
+		</text>
+	</license>
+</component>
+

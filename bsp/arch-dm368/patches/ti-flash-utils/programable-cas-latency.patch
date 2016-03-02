@@ -1,0 +1,24 @@
+Index: ti-flash-utils/src/DM36x/Common/src/device.c
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/Common/src/device.c	2011-03-24 15:18:19.000000000 -0600
++++ ti-flash-utils/src/DM36x/Common/src/device.c	2013-05-14 14:27:14.065858879 -0600
+@@ -60,6 +60,7 @@
+ #define FLAG_FLGON		0x00000004
+ #define FLAG_FLGOFF		0x0000001
+ 
++static const Uint16 DDR_CAS_LATENCY = 5;
+ static const Uint16 DDR_T_RFC = 1275;
+ static const Uint16 DDR_T_RP = 200;
+ static const Uint16 DDR_T_RCD = 200;
+@@ -758,9 +759,9 @@
+ 
+ 	DDR->PBBPR = 0x000000FE;
+ 	
+-	DDR->SDBCR = 0xD34A32;	 //Enable DDR2 and DDR and SDram. Write '1' to BOOTUNLOCK
++	DDR->SDBCR = 0xD34032 | (DDR_CAS_LATENCY << 9);	 //Enable DDR2 and DDR and SDram. Write '1' to BOOTUNLOCK
+ 
+-	DDR->SDBCR = 0x534A32;	//Enable DDR2 and DDR and SDram. Write '0' to BOOTUNLOCK
++	DDR->SDBCR = 0x534032 |  (DDR_CAS_LATENCY << 9);	//Enable DDR2 and DDR and SDram. Write '0' to BOOTUNLOCK
+ 
+ 	DDR->SDRCR = (DDR_RR * DDR_FREQ) / 10; //Program SDRAM Refresh Control Registers
+ 

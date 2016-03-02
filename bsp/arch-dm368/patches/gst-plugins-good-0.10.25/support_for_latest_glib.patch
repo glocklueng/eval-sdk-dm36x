@@ -1,0 +1,13 @@
+Index: gst-plugins-good-0.10.25/src/sys/v4l2/v4l2_dm365_ipipe.h
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/sys/v4l2/v4l2_dm365_ipipe.h	2012-02-28 11:03:21.765564637 -0600
++++ gst-plugins-good-0.10.25/src/sys/v4l2/v4l2_dm365_ipipe.h	2012-02-28 11:04:02.914973606 -0600
+@@ -44,7 +44,7 @@
+ #ifndef __V4L2_DM365_IPIPE_H__
+ #define __V4L2_DM365_IPIPE_H__
+ 
+-#include <glib/gtypes.h>
++#include <glib.h>
+ #include "gstv4l2object.h"
+ 
+ /* simple check whether the resizer is open */

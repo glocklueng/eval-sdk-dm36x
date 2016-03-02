@@ -1,0 +1,164 @@
+Index: ti-flash-utils/src/DM36x/GNU/ubl/build/makefile
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/GNU/ubl/build/makefile	2013-05-14 14:26:48.443181645 -0600
++++ ti-flash-utils/src/DM36x/GNU/ubl/build/makefile	2013-05-14 14:27:04.554349926 -0600
+@@ -33,10 +33,16 @@
+ endif
+ ifeq ($(TYPE),sdmmc)
+ 	CFLAGS+= -DUBL_SDMMC
+-  SOURCES+= sdmmc.c sdmmcboot.c 
++  SOURCES+= sdmmc.c sdmmcboot.c
+ endif
+ 
+ OBJECTS:=$(patsubst %.c,%_$(TYPE).o,$(SOURCES)) $(patsubst %.c,%_$(TYPE).o,$(ASSEMBLY))
++
++ifneq ($(TEST_MEMORY),)
++  CFLAGS+= -DSDRAM_BASE=$(SDRAM_BASE) -DSDRAM_SIZE=$(SDRAM_SIZE) -DTEST_MEMORY=$(TEST_MEMORY)
++endif
++  OBJECTS+=memtest.o
++
+ EXECUTABLE:=$(PROGRAM)_$(DEVSTRING)_$(TYPE)
+ BINARY:=../$(EXECUTABLE).bin
+ LINKERSCRIPT=../$(PROGRAM).lds
+Index: ti-flash-utils/src/Common/ubl/src/memtest.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ ti-flash-utils/src/Common/ubl/src/memtest.c	2013-05-14 14:26:48.603173385 -0600
+@@ -0,0 +1,110 @@
++/* -------------------------------------------------------------------------
++  FILE        : memtest.c
++  PROJECT     : TI Booting and Flashing Utilities
++  AUTHOR      : Todd Fischer
++  DESC        : Memory test that runs in UBL
++ --------------------------------------------------------------------------- */
++
++// General type include
++#include "tistdtypes.h"
++
++// Project specific debug functionality
++#include "debug.h"
++
++#define TEST_VALUE   0x5a5a5a5aL
++
++static inline void stop_test(void)
++{
++	DEBUG_printString("\r\nToo many DDR test failures, stopping\r\n");
++	do {
++
++	} while (1);
++}
++
++static inline void memory_test_failed(char *msg, Uint32 memory_address,
++				      Uint32 expected_value, 
++				      Uint32 actual_value)
++{
++	DEBUG_printString("\r\nERROR: ");
++	DEBUG_printString(msg);
++	DEBUG_printString(" -- address: 0x");
++	DEBUG_printHexInt(memory_address);
++	DEBUG_printString(", expected: 0x");
++	DEBUG_printHexInt(expected_value);
++	DEBUG_printString(", actual: 0x");
++	DEBUG_printHexInt(actual_value);
++}
++
++static inline void write_test(Uint32 *memory_base, Uint32 memory_size)
++{
++	volatile Uint32 *ptr  = memory_base;
++	Uint32 *pend = memory_base + ( memory_size / 4 );
++	Uint32  value;
++	Uint8 error_count = 0;
++
++	DEBUG_printString("\r\nDDR write test started\r\n");
++	for (; ptr < pend; ptr++) {
++		/* Determine the test value and write it to memory */
++
++		value = ((Uint32)ptr) ^ TEST_VALUE;
++		*ptr = value;
++
++		/* Read the test value and verify that it successful
++		 * write to a memory location (but not necessary the
++		 * correct memory location -- addressing aliasing
++		 * failures will be caught in the re-read test.
++		 */
++
++		if (value != *ptr) {
++			memory_test_failed("Write memory test failed",
++					   (Uint32)ptr, value, *ptr);
++			if (error_count++ >= 10) {
++				stop_test();
++			}
++		}
++	}
++	if(!error_count)
++		DEBUG_printString("DDR write test succeeded!!\r\n");
++}
++
++
++static inline void reread_test(Uint32 *memory_base, Uint32 memory_size)
++{
++	volatile Uint32 *ptr  = memory_base;
++	Uint32 *pend = memory_base + ( memory_size / 4 );
++	Uint32  value;
++	Uint8 error_count = 0;
++
++	DEBUG_printString("\r\nDDR read test started\r\n");
++	for (; ptr < pend; ptr++) {
++		/* Determine the test value */
++
++		value = ((Uint32)ptr) ^ TEST_VALUE;
++
++		/* Read the test value and verify that it contains
++		 * the expected value.  This would not be the case if there
++		 * were an address aliasing error that was not caught
++		 * by the basic write test.
++		 */
++
++		if (value != *ptr) {
++			memory_test_failed("Read back memory test failed",
++					   (Uint32)ptr, value, *ptr);
++			if (error_count++ >= 10) {
++				stop_test();
++			}
++		}
++	}
++	if(!error_count)
++		DEBUG_printString("DDR read test succeeded!!\r\n");
++}
++
++/**************************************************************************
++ * Public Functions
++ **************************************************************************/
++
++void memory_test(Uint32 *memory_base, Uint32 memory_size)
++{
++	write_test(memory_base, memory_size);
++	reread_test(memory_base, memory_size);
++}
+Index: ti-flash-utils/src/Common/ubl/src/ubl.c
+===================================================================
+--- ti-flash-utils.orig/src/Common/ubl/src/ubl.c	2013-05-14 14:26:48.519177722 -0600
++++ ti-flash-utils/src/Common/ubl/src/ubl.c	2013-05-14 14:27:04.502352610 -0600
+@@ -40,6 +40,13 @@
+ #include "sdmmcboot.h"
+ #endif
+ 
++#ifdef TEST_MEMORY
++extern void memory_test(Uint32 memory_base, Uint32 memory_size);
++#else
++#define memory_test(memory_base, memory_size) do {} while (0)
++#endif
++
++
+ /************************************************************
+ * Explicit External Declarations                            *
+ ************************************************************/
+@@ -127,6 +134,8 @@
+ //    DEBUG_printString(" initialization passed!\r\n");
+   }
+ 
++  memory_test(SDRAM_BASE, SDRAM_SIZE);
++
+   // Set RAM pointer to beginning of RAM space
+   UTIL_setCurrMemPtr(0);
+ 

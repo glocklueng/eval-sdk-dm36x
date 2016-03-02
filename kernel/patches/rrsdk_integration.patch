@@ -1,0 +1,109 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/Makefile	2011-02-23 12:18:02.379855467 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/Makefile	2011-02-23 12:19:33.420305514 -0600
+@@ -1,7 +1,7 @@
+ VERSION = 2
+ PATCHLEVEL = 6
+ SUBLEVEL = 32
+-EXTRAVERSION = .17
++EXTRAVERSION = -17-ridgerun
+ NAME = Man-Eating Seals of Antiquity
+ 
+ # *DOCUMENTATION*
+@@ -17,7 +17,7 @@
+ MAKEFLAGS += -rR --no-print-directory
+ 
+ # Add custom flags here to avoid conflict with updates
+-EXTRAVERSION := $(EXTRAVERSION)-davinci1
++EXTRAVERSION := $(EXTRAVERSION)
+ 
+ # We are using a recursive build, so we need to do a little thinking
+ # to get the ordering right.
+@@ -941,7 +941,7 @@
+ localver-full = $(localver)$(localver-auto)
+ 
+ # Store (new) KERNELRELASE string in include/config/kernel.release
+-kernelrelease = $(KERNELVERSION)$(localver-full)
++kernelrelease = $(KERNELVERSION)
+ include/config/kernel.release: include/config/auto.conf FORCE
+ 	$(Q)rm -f $@
+ 	$(Q)echo $(kernelrelease) > $@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/Kconfig	2011-02-23 12:18:02.331854650 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/Kconfig	2011-02-23 12:18:22.600089271 -0600
+@@ -3,7 +3,7 @@
+ # see Documentation/kbuild/kconfig-language.txt.
+ #
+ 
+-mainmenu "Linux Kernel Configuration"
++#mainmenu "Linux Kernel Configuration"
+ 
+ config ARM
+ 	bool
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/memory.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/memory.h	2011-02-23 12:18:02.343793534 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/memory.h	2011-02-23 12:18:22.600089271 -0600
+@@ -23,6 +23,7 @@
+ #define DAVINCI_DDR_BASE	0x80000000
+ #define DA8XX_DDR_BASE		0xc0000000
+ 
++
+ #if defined(CONFIG_ARCH_DAVINCI_DA8XX) && defined(CONFIG_ARCH_DAVINCI_DMx)
+ #error Cannot enable DaVinci and DA8XX platforms concurrently
+ #elif defined(CONFIG_ARCH_DAVINCI_DA8XX)
+@@ -31,6 +32,7 @@
+ #define PHYS_OFFSET DAVINCI_DDR_BASE
+ #endif
+ 
++
+ /*
+  * Increase size of DMA-consistent memory region
+  */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/net/tokenring/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/net/tokenring/Kconfig	2011-02-23 12:18:02.367850094 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/net/tokenring/Kconfig	2011-02-23 12:18:22.600089271 -0600
+@@ -3,7 +3,7 @@
+ #
+ 
+ # So far, we only have PCI, ISA, and MCA token ring devices
+-menuconfig TR
++menuconfig KTR
+ 	tristate "Token Ring driver support"
+ 	depends on NETDEVICES && !UML
+ 	depends on (PCI || ISA || MCA || CCW)
+@@ -18,7 +18,7 @@
+ 	  from <http://www.tldp.org/docs.html#howto>. Most people can
+ 	  say N here.
+ 
+-if TR
++if KTR
+ 
+ config IBMTR
+ 	tristate "IBM Tropic chipset based adapter support"
+@@ -182,4 +182,4 @@
+ 	  To compile this driver as a module, choose M here: the module will be
+ 	  called smctr.
+ 
+-endif # TR
++endif # KTR
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Kconfig
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Kconfig	2011-02-23 12:18:02.351856527 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Kconfig	2011-02-23 12:18:22.600089271 -0600
+@@ -1,4 +1,4 @@
+-config ECHO
++config KECHO
+ 	tristate "Line Echo Canceller support"
+ 	default n
+ 	---help---
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Makefile	2011-02-23 12:18:02.359856104 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/staging/echo/Makefile	2011-02-23 12:18:22.600089271 -0600
+@@ -1 +1 @@
+-obj-$(CONFIG_ECHO) += echo.o
++obj-$(CONFIG_KECHO) += echo.o

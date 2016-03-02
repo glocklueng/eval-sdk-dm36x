@@ -1,0 +1,89 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c
+@@ -591,6 +591,8 @@
+ MUX_CFG(DM365,	GPIO82,		1,   17,    1,    1,     false)
+ MUX_CFG(DM365,	VCLK,		1,   22,    1,    0,     false)
+ 
++MUX_CFG(DM365,	CLKOUT1,	4,   16,    3,    3,	 false)
++
+ MUX_CFG(DM365,	VOUT_B0,	4,   0,     3,    3,     false)
+ MUX_CFG(DM365,	VOUT_B1,	4,   2,     3,    3,     false)
+ MUX_CFG(DM365,	VOUT_B2,	1,   20,    3,    2,     false)
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/tlv320aic3x.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/tlv320aic3x.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/codecs/tlv320aic3x.c
+@@ -899,7 +899,9 @@
+ 	}
+ 
+ found:
+-	data = aic3x_read_reg_cache(codec, AIC3X_PLL_PROGA_REG);
++	/* storing PLL state at data */
++	data = aic3x_read_reg_cache(codec, AIC3X_PLL_PROGA_REG) & 0x80;
++
+ 	aic3x_write(codec, AIC3X_PLL_PROGA_REG, data | (pll_p << PLLP_SHIFT));
+ 	aic3x_write(codec, AIC3X_OVRF_STATUS_AND_PLLR_REG, pll_r << PLLR_SHIFT);
+ 	aic3x_write(codec, AIC3X_PLL_PROGB_REG, pll_j << PLLJ_SHIFT);
+@@ -1207,11 +1209,10 @@
+ 	aic3x_write(codec, LDAC_VOL, DEFAULT_VOL | MUTE_ON);
+ 	aic3x_write(codec, RDAC_VOL, DEFAULT_VOL | MUTE_ON);
+ 
+-	/* DAC to HP default volume and route to Output mixer */
+-	aic3x_write(codec, DACL1_2_HPLOUT_VOL, DEFAULT_VOL | ROUTE_ON);
+-	aic3x_write(codec, DACR1_2_HPROUT_VOL, DEFAULT_VOL | ROUTE_ON);
+-	aic3x_write(codec, DACL1_2_HPLCOM_VOL, DEFAULT_VOL | ROUTE_ON);
+-	aic3x_write(codec, DACR1_2_HPRCOM_VOL, DEFAULT_VOL | ROUTE_ON);
++	/* DAC to HP max volume and route to Output mixer */
++	aic3x_write(codec, DACL1_2_HPLOUT_VOL, 0x80 | ROUTE_ON);
++	aic3x_write(codec, DACR1_2_HPROUT_VOL, 0x80 | ROUTE_ON);
++
+ 	/* DAC to Line Out default volume and route to Output mixer */
+ 	aic3x_write(codec, DACL1_2_LLOPM_VOL, DEFAULT_VOL | ROUTE_ON);
+ 	aic3x_write(codec, DACR1_2_RLOPM_VOL, DEFAULT_VOL | ROUTE_ON);
+@@ -1266,6 +1267,10 @@
+ 	aic3x_write(codec, LINE2L_2_MONOLOPM_VOL, DEFAULT_VOL);
+ 	aic3x_write(codec, LINE2R_2_MONOLOPM_VOL, DEFAULT_VOL);
+ 
++	/* Enabling the microphone by setting its gain to 0dB */
++	aic3x_write(codec, MIC3LR_2_LADC_CTRL, 0x0F);
++	aic3x_write(codec, MIC3LR_2_RADC_CTRL, 0xF0);
++
+ 	/* off, with power on */
+ 	aic3x_set_bias_level(codec, SND_SOC_BIAS_STANDBY);
+ 
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-evm.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-evm.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-evm.c
+@@ -62,6 +62,9 @@
+ 				machine_is_davinci_da850_evm())
+ 		sysclk = 24576000;
+ 
++	else if (machine_is_dm368_leopard())
++                sysclk = 24000000;
++
+ 	else
+ 		return -EINVAL;
+ 
+@@ -195,7 +198,7 @@
+ 	.ops = &evm_ops,
+ };
+ 
+-/* davinci dm6446, dm355 evm audio machine driver */
++/* davinci dm6446, dm355, dm365 leopard or dm365 evm audio machine driver */
+ static struct snd_soc_card snd_soc_card_evm = {
+ 	.name = "DaVinci EVM",
+ 	.platform = &davinci_soc_platform,
+@@ -282,8 +285,8 @@
+ 	int index;
+ 	int ret;
+ 
+-	if (machine_is_davinci_evm()) {
+-		evm_snd_dev_data = &evm_snd_devdata;
++	if (machine_is_davinci_evm() || machine_is_dm368_leopard()) {
++		evm_snd_dev_data = &dm365_evm_snd_devdata;
+ 		index = 0;
+ 	} else if (machine_is_davinci_dm355_evm()) {
+ 		evm_snd_dev_data = &evm_snd_devdata;

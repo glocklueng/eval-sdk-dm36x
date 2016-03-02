@@ -1,0 +1,13 @@
+Index: gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2bufferpool.c
+===================================================================
+--- gst-plugins-good-1.0.5.orig/src/sys/v4l2/gstv4l2bufferpool.c	2013-06-17 08:57:42.780343385 -0600
++++ gst-plugins-good-1.0.5/src/sys/v4l2/gstv4l2bufferpool.c	2013-06-17 09:01:45.796339222 -0600
+@@ -336,7 +336,7 @@
+       if (max_buffers == 0 || num_buffers < max_buffers) {
+         /* if we are asked to provide more buffers than we have allocated, start
+          * copying buffers when we only have 2 buffers left in the pool */
+-        copy_threshold = 2;
++        copy_threshold = 1;
+       } else {
+         /* we are certain that we have enough buffers so we don't need to
+          * copy */

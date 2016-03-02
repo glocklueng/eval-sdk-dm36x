@@ -1,0 +1,24 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c	2011-02-23 15:04:16.404171158 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/dm365.c	2011-02-23 15:21:21.383800237 -0600
+@@ -580,6 +580,7 @@
+ MUX_CFG(DM365,	GPIO20,		3,   21,    3,    0,	 false)
+ MUX_CFG(DM365,	GPIO33,		4,   12,    3,	  0,	 false)
+ MUX_CFG(DM365,	GPIO40,		4,   26,    3,	  0,	 false)
++MUX_CFG(DM365,	GPIO66,		2,   0,     3,	  0,	 false)
+ MUX_CFG(DM365,	GPIO80,		1,   20,    3,	  1,	 false)
+ MUX_CFG(DM365,	GPIO82,		1,   17,    1,    1,     false)
+ MUX_CFG(DM365,	VCLK,		1,   22,    1,    0,     false)
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/mux.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/mux.h	2011-02-23 15:04:16.404171158 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/arch/arm/mach-davinci/include/mach/mux.h	2011-02-23 15:22:21.175921080 -0600
+@@ -295,6 +295,7 @@
+ 	DM365_GPIO20,
+ 	DM365_GPIO33,
+ 	DM365_GPIO40,
++	DM365_GPIO66,
+ 	DM365_GPIO80,
+ 	DM365_GPIO82,
+ 	DM365_VCLK,

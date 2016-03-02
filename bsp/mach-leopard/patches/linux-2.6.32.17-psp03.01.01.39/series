@@ -1,0 +1,9 @@
+leopard-dm368-support.patch
+audio-mclk.patch
+usb_leopard_support.patch
+add-probe-verification-for-tvp-chips.patch
+leopard-dm368-i2c-timeout-error-fix.patch
+leopard-dm368-prgb-support.patch
+fix-frequency-tolerance-for-HD-video.patch
+fix-pll1-frequency.patch
+leopard-dm368-pwm-support.patch

@@ -1,0 +1,527 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_previewer.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_previewer.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_previewer.c
+@@ -137,6 +137,7 @@
+ 		chan->primary_user = 0;
+ 		if (chan->config_state == STATE_CONFIGURED)
+ 			kfree(chan->user_config);
++		imp_hw_if->unlock_chain();
+ 	}
+ 
+ 	kfree(filp->private_data);
+@@ -178,7 +179,6 @@
+ 	switch (cmd) {
+ 	case PREV_QUERYBUF:
+ 	case PREV_REQBUF:
+-	case PREV_S_PARAM:
+ 	case PREV_PREVIEW:
+ 	case PREV_S_CONFIG:
+ 		{
+@@ -287,12 +287,6 @@
+ 
+ 			dev_dbg(prev_dev, "PREV_S_PARAM:\n");
+ 
+-			if (chan->config_state != STATE_CONFIGURED) {
+-				dev_err(prev_dev, "Channel not configured\n");
+-				ret = -EINVAL;
+-				goto ERROR;
+-			}
+-
+ 			module_if =
+ 			    imp_get_module_interface(prev_dev,
+ 						     module_param->module_id);
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_resizer.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_resizer.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_resizer.c
+@@ -291,9 +291,6 @@
+ 			struct rsz_channel_config *user_config =
+ 			    (struct rsz_channel_config *)arg;
+ 
+-			dev_err(rsz_device, "RSZ_G_CONFIG:%d:%d:%d\n",
+-				user_config->oper_mode, user_config->chain,
+-				user_config->len);
+ 			if (ISNULL(user_config->config)) {
+ 				ret = -EINVAL;
+ 				dev_err(rsz_device,
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c
+@@ -394,7 +394,7 @@
+ static int ipipe_set_ipipe_if_address(void *config, unsigned int address);
+ 
+ /* IPIPE hardware limits */
+-#define IPIPE_MAX_OUTPUT_WIDTH_A	2176
++#define IPIPE_MAX_OUTPUT_WIDTH_A	3000 //2176
+ #define IPIPE_MAX_OUTPUT_WIDTH_B	640
+ 
+ /* Based on max resolution supported. QXGA */
+@@ -2871,7 +2871,7 @@
+ 	int temp;
+ 	if (pix != IPIPE_UYVY && pix != IPIPE_420SP_Y && pix != IPIPE_420SP_C) {
+ 		dev_err(dev,
+-			"rsz_validate_out_pix_formats"
++			"rsz_validate_out_pix_formats input "
+ 			"pix format not supported, %d\n", pix);
+ 		return -EINVAL;
+ 	}
+@@ -2907,7 +2907,7 @@
+ 	    && pix != IPIPE_420SP_C
+ 	    && pix != IPIPE_YUV420SP && pix != IPIPE_BAYER) {
+ 		dev_err(dev,
+-			"rsz_validate_out_pix_formats"
++			"rsz_validate_out_pix_formats output"
+ 			"pix format not supported, %d\n", pix);
+ 		return -EINVAL;
+ 	}
+@@ -3074,6 +3074,9 @@
+ 	if (ss_config->output1.enable) {
+ 		param->rsz_en[RSZ_A] = ENABLE;
+ 		param->rsz_rsc_param[RSZ_A].mode = ONE_SHOT;
++
++//printk("\nvalidate output format RSZ_A: \n    ss_config->output1.pix_fmt: %i \n    ss_config->output1.width: %i\n    ss_config->output1.height: %i \n    line_len: %i ",  ss_config->output1.pix_fmt, ss_config->output1.width, ss_config->output1.height, line_len);
++
+ 		ret = rsz_validate_output_image_format(dev,
+ 						       ss_config->output1.
+ 						       pix_fmt,
+@@ -3086,8 +3089,23 @@
+ 			mutex_unlock(&oper_state.lock);
+ 			return ret;
+ 		}
+-		param->ext_mem_param[RSZ_A].rsz_sdr_oft_y = line_len;
+-		param->ext_mem_param[RSZ_A].rsz_sdr_oft_c = line_len_c;
++
++		if (!ss_config->output1.line_length){
++			param->ext_mem_param[RSZ_A].rsz_sdr_oft_y = line_len;
++			param->ext_mem_param[RSZ_A].rsz_sdr_oft_c = line_len_c;
++		} else {
++			param->ext_mem_param[RSZ_A].rsz_sdr_oft_y =
++				ss_config->output1.line_length;
++
++			if ((ss_config->output1.pix_fmt == IPIPE_UYVY) ||
++			    (ss_config->output1.pix_fmt == IPIPE_BAYER))
++				param->ext_mem_param[RSZ_A].rsz_sdr_oft_c = 0;
++			else
++				param->ext_mem_param[RSZ_A].rsz_sdr_oft_c =
++					ss_config->output1.line_length;
++		}
++		dev_dbg(dev, "configure_resizer_in_ss_mode, y-oft = %d, c-oft = %d\n",
++			param->ext_mem_param[RSZ_A].rsz_sdr_oft_y, ss_config->output1.line_length);
+ 		ret = configure_resizer_out_params(param,
+ 						   RSZ_A,
+ 						   &ss_config->output1,
+@@ -3104,6 +3122,9 @@
+ 		else
+ 			enable_422_420_conversion(param, RSZ_A,
+ 							  DISABLE);
++
++		param->rsz_rsc_param[RSZ_A].i_hps = ss_config->input.i_hps;
++		param->rsz_rsc_param[RSZ_A].h_phs = ss_config->input.h_phs;
+ 		if (ret) {
+ 			mutex_unlock(&oper_state.lock);
+ 			dev_err(dev, "error configuring resizer output1\n");
+@@ -3114,6 +3135,9 @@
+ 	if (ss_config->output2.enable) {
+ 		param->rsz_en[RSZ_A] = ENABLE;
+ 		param->rsz_rsc_param[RSZ_B].mode = ONE_SHOT;
++
++//printk("\nvalidate output format RSZ_B: \n    ss_config->output2.pix_fmt: %i \n    ss_config->output2.width: %i\n    ss_config->output2.height: %i \n    line_len: %i ",  ss_config->output2.pix_fmt, ss_config->output2.width, ss_config->output2.height, line_len);
++
+ 		ret = rsz_validate_output_image_format(dev,
+ 						       ss_config->output2.
+ 						       pix_fmt,
+@@ -3216,6 +3240,11 @@
+ 		if (param->rsz_en[RSZ_A]) {
+ 
+ 			calculate_resize_ratios(param, RSZ_A);
++			if (ss_config->input.rsz){
++				param->rsz_rsc_param[RSZ_A].h_dif =
++						ss_config->input.rsz;
++				dev_dbg(dev,"Overriding resize ratio calculation\n");
++			}
+ 			calculate_sdram_offsets(param, RSZ_A);
+ 
+ 			/* Overriding resize ratio calculation */
+@@ -3636,7 +3665,8 @@
+ 		mutex_unlock(&oper_state.lock);
+ 		return -EINVAL;
+ 	}
+-	param->ipipeif_param.hnum = ss_config->input.image_width;
++	dev_dbg(dev, "%d - %d x %d\n", ss_config->input.hnum, ss_config->input.image_width, ss_config->input.image_height);
++	param->ipipeif_param.hnum = ss_config->input.hnum;
+ 	param->ipipeif_param.vnum = ss_config->input.image_height;
+ 	param->ipipeif_param.glob_hor_size = ss_config->input.ppln;
+ 	param->ipipeif_param.glob_ver_size = ss_config->input.lpfr;
+@@ -3698,6 +3728,12 @@
+ 		if (oper_state.rsz_chained) {
+ 			if (param->rsz_en[RSZ_A]) {
+ 				calculate_resize_ratios(param, RSZ_A);
++				/* Overriding resize ratio calculation */
++				if (ss_config->input.rsz_ratio){
++					param->rsz_rsc_param[RSZ_A].h_dif =
++						ss_config->input.rsz_ratio;
++					dev_dbg(dev,"Overriding resize ratio calculation\n");
++				}
+ 				calculate_sdram_offsets(param, RSZ_A);
+ 			}
+ 			if (param->rsz_en[RSZ_B]) {
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.h
+@@ -280,6 +280,27 @@
+ #define BSC_COL_HNUM  		(0x444)
+ #define BSC_COL_HSKIP  		(0x448)
+ 
++/* Boundary Signal Calculator */
++#define BSC_EN  			(0x400)
++#define BSC_MODE	  		(0x404)
++#define BSC_TYP  			(0x408)
++#define BSC_ROW_VCT  		(0x40C)
++#define BSC_ROW_SHF  		(0x410)
++#define BSC_ROW_VPOS  		(0x414)
++#define BSC_ROW_VNUM  		(0x418)
++#define BSC_ROW_VSKIP  		(0x41C)
++#define BSC_ROW_HPOS  		(0x420)
++#define BSC_ROW_HNUM  		(0x424)
++#define BSC_ROW_HSKIP  		(0x428)
++#define BSC_COL_VCT  		(0x42C)
++#define BSC_COL_SHF  		(0x430)
++#define BSC_COL_VPOS  		(0x434)
++#define BSC_COL_VNUM  		(0x438)
++#define BSC_COL_VSKIP  		(0x43C)
++#define BSC_COL_HPOS  		(0x440)
++#define BSC_COL_HNUM  		(0x444)
++#define BSC_COL_HSKIP  		(0x448)
++
+ /* Resizer */
+ #define RSZ_SRC_EN		(0x0)
+ #define RSZ_SRC_MODE		(0x4)
+@@ -493,6 +514,16 @@
+ 
+ /* Boundary Signal Calculator */
+ #define BSC_CEN_SHIFT	(3)
++#define BSC_REN_SHIFT	(2)
++#define BSC_COL_MASK	(0x3)
++#define BSC_VCT_MASK	(0x3)
++#define BSC_SHF_MASK	(0x7)
++#define BSC_POS_MASK	(0xFFF)
++#define BSC_NUM_MASK	(0xFFF)
++#define BSC_SKIP_MASK	(0x1F)
++
++/* Boundary Signal Calculator */
++#define BSC_CEN_SHIFT	(3)
+ #define BSC_REN_SHIFT	(2)
+ #define BSC_COL_MASK	(0x3)
+ #define BSC_VCT_MASK	(0x3)
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/dm365_ipipe.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/dm365_ipipe.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/dm365_ipipe.h
+@@ -702,6 +702,7 @@
+ 	IPIPE_BSC_IN_CB,
+ 	IPIPE_BSC_IN_CR
+ };
++
+ /* structure for Boundary Signal Calculator */
+ struct prev_bsc {
+ 	/* enable/disable */
+@@ -797,6 +798,8 @@
+  */
+ struct prev_ss_input_spec {
+ 	/* width of the image in SDRAM. */
++	unsigned int hnum;
++	/* width of the image in SDRAM. */
+ 	unsigned int image_width;
+ 	/* height of the image in SDRAM */
+ 	unsigned int image_height;
+@@ -872,6 +875,9 @@
+ 	enum ipipe_colpat_t colp_elop;
+ 	/* Color pattern for even line, even pixel */
+ 	enum ipipe_colpat_t colp_elep;
++
++	/*Resize factor used by Frame Division*/
++	unsigned int rsz_ratio;
+ };
+ 
+ struct prev_ss_output_spec {
+@@ -977,6 +983,8 @@
+  */
+ 
+ struct rsz_ss_input_spec {
++		/* width of the image in SDRAM. */
++	unsigned int hnum;
+ 	/* width of the image in SDRAM. */
+ 	unsigned int image_width;
+ 	/* height of the image in SDRAM */
+@@ -1028,6 +1036,12 @@
+ 	unsigned char align_sync;
+ 	/* ipipeif resize start position */
+ 	unsigned int rsz_start;
++	/*Phase value in horizontal resize,used by Frame Division Mode-H*/
++	unsigned short h_phs;
++	/*Horizontal Start Position of the Input*/
++	unsigned short i_hps;
++	/*Resize factor used by Frame Division*/
++	unsigned int rsz_ratio;
+ 	/* Input pixels formats
+ 	 */
+ 	enum ipipe_pix_formats pix_fmt;
+@@ -1050,6 +1064,11 @@
+ 	unsigned int vst_y;
+ 	/* line start offset for c. Only for 420 */
+ 	unsigned int vst_c;
++	/* line length. This will allow application to set a
++	 * different line length than that calculated based on
++	 * width. Set it to zero, if not used,
++	 */
++	unsigned int line_length;
+ 	/* vertical rescale interpolation type, YCbCr or Luminance */
+ 	enum rsz_intp_t v_typ_y;
+ 	/* vertical rescale interpolation type for Chrominance */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h
+@@ -47,6 +47,10 @@
+ #define V4L2_INFO
+ 
+ 
++//comment to remove print messages by dev_notice()
++#define V4L2_INFO
++
++
+ struct vpfe_pixel_format {
+ 	struct v4l2_fmtdesc fmtdesc;
+ 	/* bytes per pixel */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c
+@@ -105,6 +105,8 @@
+     SOCAM_VSYNC_ACTIVE_HIGH | SOCAM_DATA_ACTIVE_HIGH |  \
+     SOCAM_MASTER | SOCAM_DATAWIDTH_10)
+ 
++#define V4L2_CID_BINNING        (V4L2_CID_PRIVATE_BASE + 0)
++#define V4L2_CID_SKIPPING       (V4L2_CID_PRIVATE_BASE + 1)
+ 
+ #define MAX_FRMIVALS            3
+ #define CEIL(x) ((x - (int)x)==0 ? (int)x : (int)x+1)
+@@ -246,7 +248,14 @@
+     },
+     {
+     /* Full Resolution for DM365 that supports maximum 2176x2176  */
+-    .framesize = { 2176, 1944},
++    .framesize = { 2176, 1936},
++    .frameintervals = {
++        {  .numerator = 1, .denominator = 14 },
++        },
++    .num_frmivals = 1
++    },
++    {
++    .framesize = { 2592, 1458},
+     .frameintervals = {
+         {  .numerator = 1, .denominator = 14 },
+         },
+@@ -338,7 +347,23 @@
+         .maximum    = 1024,
+         .step       = 1,
+         .default_value  = 8
+-    },
++    },{
++        .id     = V4L2_CID_BINNING,
++        .type       = V4L2_CTRL_TYPE_BOOLEAN,
++        .name       = "Enable/Disable Binning",
++        .minimum    = 0,
++        .maximum    = 1,
++        .step       = 1,
++        .default_value  = 1,
++    }, {
++        .id     = V4L2_CID_SKIPPING,
++        .type       = V4L2_CTRL_TYPE_BOOLEAN,
++        .name       = "Enable/Disable Skipping",
++        .minimum    = 0,
++        .maximum    = 1,
++        .step       = 1,
++        .default_value  = 1,
++    }
+ };
+ 
+ static const unsigned int mt9p031_num_controls = ARRAY_SIZE(mt9p031_controls);
+@@ -368,6 +393,9 @@
+     unsigned short mirror_column;
+     unsigned short mirror_row;
+     struct exp_data exp;
++    /*Flags to enable/disable scaling*/
++    unsigned char binning_enable;
++    unsigned char skipping_enable;
+ };
+ 
+ static inline struct mt9p031 *to_mt9p031(struct v4l2_subdev *sd)
+@@ -682,19 +710,21 @@
+      * Remember for xskip=2X,Row Skip=1,
+      *          for xskip=3X,Row Skip=2, and so on.
+      */
+-    if(xskip & 1)
+-        xbin = 1;
+-    else if (xskip & 2)
+-        xbin = 2;
+-    else if (xskip & 4)
+-        xbin = 4;
+-
+-    if(yskip & 1)
+-        ybin = 1;
+-    else if (yskip & 2)
+-        ybin = 2;
+-    else if (yskip & 4)
+-        ybin = 4;
++    if (mt9p031->binning_enable){
++	    if(xskip & 1)
++		xbin = 1;
++	    else if (xskip & 2)
++		xbin = 2;
++	    else if (xskip & 4)
++		xbin = 4;
++
++	    if(yskip & 1)
++		ybin = 1;
++	    else if (yskip & 2)
++		ybin = 2;
++	    else if (yskip & 4)
++		ybin = 4;
++	}
+ 
+     v4l2_dbg(1, debug, sd, "xskip %u, width %u/%u, yskip %u,"
+         "height %u/%u\n", xskip, width, rect->width, yskip,
+@@ -779,7 +809,7 @@
+ {
+     struct mt9p031 *mt9p031 = to_mt9p031(sd);
+     int ret;
+-    u16 xskip, yskip;
++    u16 xskip=1, yskip=1;
+     struct v4l2_rect rect = {
+         .left   = mt9p031->x_current,
+         .top    = mt9p031->y_current,
+@@ -787,25 +817,27 @@
+         .height = f->fmt.pix.height,
+     };
+ 
+-    /*
+-     * try_fmt has put rectangle within limits.
+-     * S_FMT - use binning and skipping for scaling, recalculate
+-     * limits, used for cropping
+-     */
+-    /* Is this more optimal than just a division */
+-    for (xskip = 8; xskip > 1; xskip--)
+-        if (rect.width * xskip <= MT9P031_MAX_WIDTH)
+-            break;
+-
+-    for (yskip = 8; yskip > 1; yskip--)
+-        if (rect.height * yskip <= MT9P031_MAX_HEIGHT)
+-            break;
+-	
+-	if (xskip != yskip){
+-		if (xskip > yskip)
+-			xskip = yskip;
+-		else 
+-			yskip = xskip;
++	if (mt9p031->skipping_enable){
++		/*
++		 * try_fmt has put rectangle within limits.
++		 * S_FMT - use binning and skipping for scaling, recalculate
++		 * limits, used for cropping
++		 */
++		/* Is this more optimal than just a division */
++		for (xskip = 8; xskip > 1; xskip--)
++			if (rect.width * xskip <= MT9P031_MAX_WIDTH)
++				break;
++
++		for (yskip = 8; yskip > 1; yskip--)
++			if (rect.height * yskip <= MT9P031_MAX_HEIGHT)
++				break;
++
++		if (xskip != yskip){
++			if (xskip > yskip)
++				xskip = yskip;
++			else
++				yskip = xskip;
++		}
+ 	}
+ 	
+     recalculate_limits(mt9p031, xskip, yskip);
+@@ -821,11 +853,11 @@
+     if (pix->height < MT9P031_MIN_HEIGHT)
+         pix->height = MT9P031_MIN_HEIGHT;
+     if (pix->height > MT9P031_MAX_HEIGHT)
+-        pix->height = MT9P031_MAX_HEIGHT;
++        pix->height = MT9P031_MAX_HEIGHT + 1;
+     if (pix->width < MT9P031_MIN_WIDTH)
+         pix->width = MT9P031_MIN_WIDTH;
+     if (pix->width > MT9P031_MAX_WIDTH)
+-        pix->width = MT9P031_MAX_WIDTH;
++        pix->width = MT9P031_MAX_WIDTH + 1;
+ 
+     pix->width &= ~0x01; /* has to be even */
+     pix->height &= ~0x01; /* has to be even */
+@@ -1047,6 +1079,12 @@
+         reg = MT9P031_GREEN_2_GAIN;
+         gain = true;
+         break;
++    case V4L2_CID_BINNING:
++        ctrl->value = mt9p031->binning_enable;
++        break;
++    case V4L2_CID_SKIPPING:
++        ctrl->value = mt9p031->skipping_enable;
++        break;
+     }
+     if (gain){
+         data = reg_read(client, reg);
+@@ -1223,6 +1261,16 @@
+                 break;
+         }
+         break;
++    case V4L2_CID_BINNING:
++        mt9p031->binning_enable =  ctrl->value;
++        v4l2_dbg(1, debug, sd,
++                "Setting binning flag to %u \n", ctrl->value);
++        break;
++    case V4L2_CID_SKIPPING:
++        mt9p031->skipping_enable = ctrl->value;
++        v4l2_dbg(1, debug, sd,
++                "Setting skipping flag to %u \n", ctrl->value);
++        break;
+     }
+     reg_clear(client, MT9P031_OUTPUT_CONTROL, 1);
+ 
+@@ -1303,7 +1351,8 @@
+     mt9p031->ybin = 1;
+     mt9p031->mirror_column = 0;
+     mt9p031->mirror_row = 0;
+-
++    mt9p031->skipping_enable = 1;
++    mt9p031->binning_enable = 1;
+     /* Register with V4L2 layer as slave device */
+     sd = &mt9p031->sd;
+     v4l2_i2c_subdev_init(sd, client, &mt9p031_ops);
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_common.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_common.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/imp_common.c
+@@ -1327,12 +1327,15 @@
+ 					" -1 for user ptr IO\n");
+ 				return -1;
+ 			}
++#if 0
++			/* According to VPFE datasheet YUV: Offset (YUV_OFT_Y) has no multiple of 32 restriction */
+ 			if (convert->out_buff1.offset % 32) {
+ 				dev_err(dev,
+ 					"out_buff1 Offset to be a multiple"
+ 					" of 32\n");
+ 				return -1;
+ 			}
++#endif
+ 			offset = imp_uservirt_to_phys(dev, convert->out_buff1.offset);
+ 			if (!offset) {
+ 				dev_err(dev, "out_buff1 Offset - can't get user page\n");

@@ -1,0 +1,58 @@
+#$L$
+# Copyright (C) 2011,2013,2014 Ridgerun (http://www.ridgerun.com).
+#
+#$L$
+
+.PHONY: arch_build arch_post_build arch_clean
+
+include $(CLASSES)/flags.defs
+
+NAND_UBL=$(IMAGEDIR)/ubl_DM36x_nand
+
+CPPFLAGS+=-DCONFIG_SPLASH_ADDRESS=$(CONFIG_BTLR_SPLASH_ADDRESS)
+ifeq ($(CONFIG_BTLR_SPLASH_COMPOSITE),y)
+CPPFLAGS+=-DCONFIG_SPLASH_COMPOSITE=1
+endif
+ifeq ($(CONFIG_BTLR_SPLASH_LCD),y)
+CPPFLAGS+=-DCONFIG_SPLASH_LCD=1
+endif
+ifeq ($(CONFIG_BTLR_SPLASH_COLOR_BARS),y)
+CPPFLAGS+=-DCONFIG_SPLASH_COLOR_BARS=1
+endif
+
+arch_build:
+	$(V) if [ ! -f $(BUILT_FLAG) ] ; then \
+	    cd ti-flash-utils ; \
+	    make clean ; \
+	    cd ../ ; \
+	fi
+	$(V) $(MAKE) -C ti-flash-utils build_dm365
+
+arch_post_build:
+	@ #Add the descriptor header needed to flash and run properly UBL and U-boot
+
+PAGESIZE?=$(CONFIG_BSP_NAND_PAGE_SIZE)
+IPL_BLOCKNUM?=$(CONFIG_BSP_ARCH_INSTALLER_IPL_FLASH_BLK_START)
+IPL_SINGLE_IMAGE?=$(IMAGEDIR)/ubl_nand.nandbin
+IPL_MULTI_IMAGE?=$(IMAGEDIR)/multi_ubl_nand.nandbin
+
+gen_ipl_nandbin:
+	$(V) mono ti-flash-utils/src/DM36x/GNU/bc_DM36x.exe -pageSize $(PAGESIZE) -blockNum $(IPL_BLOCKNUM) \
+	   $(NAND_UBL).bin -o $(IPL_SINGLE_IMAGE) $(QOUT)
+ifneq ($(CONFIG_ARCH_IPL_COPIES),)
+	$(V) dd if=/dev/zero bs=$(CONFIG_BSP_NAND_BLOCK_SIZE) count=$(CONFIG_ARCH_IPL_COPIES) $(ERRQOUT) | tr '\000' '\377' > $(IPL_MULTI_IMAGE) 
+	$(V) seek=0 ; while [[ $$seek -lt $(CONFIG_ARCH_IPL_COPIES) ]] ; do \
+	  dd bs=$(CONFIG_BSP_NAND_BLOCK_SIZE) count=1 if=$(IPL_SINGLE_IMAGE) of=$(IPL_MULTI_IMAGE) seek=$$seek conv=notrunc $(ERRQOUT) ; \
+	  ((seek = seek + 1)) ; \
+	done
+endif
+
+UBOOT_BLOCKNUM?=$(shell printf "%d" $(CONFIG_BSP_ARCH_INSTALLER_UBOOT_FLASH_BLK_START))
+
+gen_uboot_nandbin:
+	$(V) mono ti-flash-utils/src/DM36x/GNU/bc_DM36x.exe -uboot -pageSize $(PAGESIZE) -blockNum $(UBOOT_BLOCKNUM) \
+	   -startAddr $(CONFIG_UBOOT_RAM_ADDRS) -loadAddr $(CONFIG_UBOOT_RAM_ADDRS) \
+	   $(BOOTLOADERIMAGE) -o $(BOOTLOADERIMAGE).nandbin $(QOUT)
+
+arch_clean:
+	$(V) $(MAKE) -C ti-flash-utils clean

@@ -1,0 +1,8 @@
+fix_nand_rbl_ecc_layout.patch
+fix_ecc_for_empty_pages.patch
+skip_env_on_sd_boot.patch
+davinci_spi_pkg_multi_length.patch
+gpio-dm36x.patch
+gpio_commands.patch
+dm365-pin-mux.patch
+lcd_commands.patch

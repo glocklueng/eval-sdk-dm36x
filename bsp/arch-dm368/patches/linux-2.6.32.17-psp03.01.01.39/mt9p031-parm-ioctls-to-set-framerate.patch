@@ -1,0 +1,98 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c	2014-08-05 11:26:05.193394900 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c	2014-08-05 13:49:26.113393869 -0600
+@@ -378,6 +378,8 @@
+     u32 ybin;
+     u32 width;
+     u32 height;
++    u32 frmi_n;
++    u32 frmi_d;
+     unsigned short x_min;           /* Camera capabilities */
+     unsigned short y_min;
+     unsigned short x_current;       /* Current window location */
+@@ -782,6 +784,8 @@
+         mt9p031->xbin = xbin;
+         mt9p031->xskip = xskip;
+         mt9p031->yskip = yskip;
++        mt9p031->frmi_d = fps;
++        mt9p031->frmi_n = 1;
+ 
+         calc_shutter(sd, mt9p031);
+         vblank = 1000000/((fps * mt9p031->exp.row_time)>>8) - mt9p031->height - 1;
+@@ -856,6 +860,49 @@
+     return 0;
+ }
+ 
++static int mt9p031_g_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parms)
++{
++	struct v4l2_captureparm *cp = &parms->parm.capture;
++	struct mt9p031 *mt9p031 = to_mt9p031(sd);
++	if (parms->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
++		return -EINVAL;
++
++	memset(cp, 0, sizeof(struct v4l2_captureparm));
++	cp->capability = V4L2_CAP_TIMEPERFRAME;
++	cp->timeperframe.numerator = mt9p031->frmi_n;
++	cp->timeperframe.denominator = mt9p031->frmi_d;
++
++	return 0;
++}
++
++static int mt9p031_s_parm(struct v4l2_subdev *sd, struct v4l2_streamparm *parms)
++{
++	struct mt9p031 *mt9p031 = to_mt9p031(sd);
++	struct i2c_client *client = v4l2_get_subdevdata(sd);
++	struct v4l2_captureparm *cp = &parms->parm.capture;
++	struct v4l2_fract *tpf = &cp->timeperframe;
++	int vblank = MT9P031_VERTICAL_BLANK_DEFAULT;
++	int fps = tpf->denominator/tpf->numerator;
++	int ret;
++
++	if (parms->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
++		return -EINVAL;
++
++	vblank = 1000000/((fps * mt9p031->exp.row_time)>>8) - mt9p031->height - 1;
++	if(vblank < MT9P031_VERTICAL_BLANK_MINIMUM){
++		vblank = MT9P031_VERTICAL_BLANK_MINIMUM;
++	}
++
++	v4l2_dbg(1, debug, sd, "Setting vertical blank to %d\n", vblank);
++	ret = reg_write(client, MT9P031_VERTICAL_BLANK, vblank);
++	if (ret < 0)
++		return -EINVAL;
++	mt9p031->vblank = vblank;
++	mt9p031->frmi_d = tpf->denominator;
++	mt9p031->frmi_n = tpf->numerator;
++	return 0;
++}
++
+ static int mt9p031_enum_framesizes(struct v4l2_subdev *sd,
+                 struct v4l2_frmsizeenum *frms)
+ {
+@@ -1004,6 +1051,8 @@
+     .s_fmt = mt9p031_set_fmt,
+     .try_fmt = mt9p031_try_fmt,
+     .s_stream = mt9p031_s_stream,
++    .s_parm = mt9p031_s_parm,
++    .g_parm = mt9p031_g_parm,
+     .enum_framesizes = mt9p031_enum_framesizes,
+     .enum_frameintervals = mt9p031_enum_frameintervals,
+ };
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c	2014-08-05 11:24:52.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c	2014-08-06 13:34:16.639026224 -0600
+@@ -2516,6 +2516,12 @@
+ 		goto out;
+ 	}
+ 
++	if (vpfe_dev->current_subdev->is_camera){
++		ret = v4l2_device_call_until_err(&vpfe_dev->v4l2_dev,
++				vpfe_dev->current_subdev->grp_id, video, s_parm, parm);
++		goto out;
++	}
++
+ 	if (vpfe_dev->started) {
+ 		v4l2_dbg(1, debug, &vpfe_dev->v4l2_dev,
+ 			"Steaming ON. Cannot change capture streaming params.");

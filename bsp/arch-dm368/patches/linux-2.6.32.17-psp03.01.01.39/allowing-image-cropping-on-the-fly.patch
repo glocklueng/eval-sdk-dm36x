@@ -1,0 +1,44 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c
+@@ -503,7 +503,9 @@
+ 	}
+ 
+ 	if (i ==  ARRAY_SIZE(vpfe_standards)) {
++#ifdef V4L2_INFO
+ 		v4l2_err(&vpfe_dev->v4l2_dev, "standard not supported\n");
++#endif
+ 		return -EINVAL;
+ 	}
+ 
+@@ -2423,13 +2425,6 @@
+ 
+ 	v4l2_dbg(1, debug, &vpfe_dev->v4l2_dev, "vpfe_s_crop\n");
+ 
+-	if (vpfe_dev->started) {
+-		/* make sure streaming is not started */
+-		v4l2_err(&vpfe_dev->v4l2_dev,
+-			"Cannot change crop when streaming is ON\n");
+-		return -EBUSY;
+-	}
+-
+ 	ret = mutex_lock_interruptible(&vpfe_dev->lock);
+ 	if (ret)
+ 		return ret;
+@@ -2493,6 +2488,15 @@
+ 		}
+ 	}
+ 	vpfe_dev->crop = crop->c;
++
++	/* Since we need to crop on-the-fly we need to setup the IMP
++	 * when the new parameters are set.
++	 */
++	if (imp_hw_if->hw_setup(vpfe_dev->pdev, NULL) < 0) {
++	    v4l2_err(&vpfe_dev->v4l2_dev,
++		    "Error setting up IMP\n");
++		ret = -EINVAL;
++	}
+ unlock_out:
+ 	mutex_unlock(&vpfe_dev->lock);
+ 	return ret;

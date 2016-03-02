@@ -1,0 +1,19 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_platform.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_platform.c	2011-08-08 13:40:15.407311803 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_platform.c	2011-08-09 08:07:45.287320233 -0600
+@@ -440,9 +440,12 @@
+ 	pll2_venc_clk = clk_get(NULL, "pll2_sysclk5");
+ 	pll2_venc_clk_rate = clk_get_rate(pll2_venc_clk);
+ 
+-	if (clk == pll1_venc_clk_rate)
++	/* MJL Allow a tolerance here: 1 part in 1000 should be fine
++	 * The reason is that for DM368 it's difficult to get precise clocks
++	 * (e.g. using 74.24MHz instead of 74.25MHz). */
++	if (clk >= pll1_venc_clk_rate/1000*999 && clk <= pll1_venc_clk_rate/1000*1001)
+ 		__raw_writel(0x18, IO_ADDRESS(SYS_VPSS_CLKCTL));
+-	else if (clk == pll2_venc_clk_rate)
++	else if (clk >= pll2_venc_clk_rate/1000*999 && clk <= pll2_venc_clk_rate/1000*1001)
+ 		__raw_writel(0x38, IO_ADDRESS(SYS_VPSS_CLKCTL));
+ 	else if (cpu_is_davinci_dm368()) {
+ 		enable_hd_clk();

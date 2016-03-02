@@ -1,0 +1,6 @@
+v4l2src-define-bayer-stride.patch
+v4l2src-support-yuv-capture-using-ipipe.patch
+v4l2src-add-property-to-specify-capture-input.patch
+v4l2src-detect-standard.patch
+v4l2src-add-property-to-specify-max-num-pool-buffers.patch
+v4l2src-no-copy-buffers.patch

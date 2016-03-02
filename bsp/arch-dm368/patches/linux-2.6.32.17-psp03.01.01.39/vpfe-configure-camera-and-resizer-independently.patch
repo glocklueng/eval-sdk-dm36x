@@ -1,0 +1,88 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c	2014-04-16 14:49:56.007579232 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c	2014-04-16 14:53:39.179580091 -0600
+@@ -640,6 +640,7 @@
+ 		goto unlock_out;
+ 	}
+ 
++  vpfe_dev->camera_configured = 0;
+ 	vpfe_dev->imp_chained = 0;
+ 	vpfe_dev->second_output = 0;
+ 	vpfe_dev->second_out_img_sz = 0;
+@@ -1568,8 +1569,11 @@
+ 	if (ret)
+ 		return ret;
+ 
++	if (fmt->type == V4L2_BUF_TYPE_PRIVATE)
++		vpfe_dev->camera_configured = 0;
++
+ 	sdinfo = vpfe_dev->current_subdev;
+-	if (sdinfo->is_camera) {
++	if (sdinfo->is_camera && !vpfe_dev->camera_configured) {
+ 		/*
+ 		 * TODO. Current implementation of camera sub device calculates
+ 		 * sensor timing values based on S_FMT. So we need to
+@@ -1587,6 +1591,7 @@
+ 			vpfe_dev->crop.height = fmt->fmt.pix.height;
+ 		} else
+ 			goto s_fmt_out;
++
+ 	}
+ 
+ 	vpfe_dev->fmt = *fmt;
+@@ -1611,13 +1616,17 @@
+ 		 * given standard and use image processor to scale it down or
+ 		 * up. So processing is different for both cases
+ 		 */
+-		if (vpfe_dev->current_subdev->is_camera)
++		if (vpfe_dev->current_subdev->is_camera
++		    && !vpfe_dev->camera_configured)
+ 			ret = vpfe_config_ccdc_image_format(vpfe_dev);
+ 
+-		if (!ret)
++		if (!ret && (fmt->type != V4L2_BUF_TYPE_PRIVATE))
+ 			ret = vpfe_config_imp_image_format(vpfe_dev);
+ 	}
+ 
++	if (fmt->type == V4L2_BUF_TYPE_PRIVATE)
++		vpfe_dev->camera_configured = 1;
++
+ s_fmt_out:
+ 	mutex_unlock(&vpfe_dev->lock);
+ 	return ret;
+@@ -2590,7 +2599,7 @@
+ 
+ 	mutex_lock(&vpfe_dev->lock);
+ 
+-	if (sdinfo->is_camera) {
++	if (sdinfo->is_camera && !vpfe_dev->camera_configured) {
+ 		/* Assume the sensor supports V4L2_PIX_FMT_SGRBG10*/
+ 		pixel_format = frms->pixel_format;
+ 		frms->pixel_format = V4L2_PIX_FMT_SGRBG10;
+@@ -2633,8 +2642,10 @@
+ static const struct v4l2_ioctl_ops vpfe_ioctl_ops = {
+ 	.vidioc_querycap	 = vpfe_querycap,
+ 	.vidioc_g_fmt_vid_cap    = vpfe_g_fmt_vid_cap,
++	.vidioc_g_fmt_type_private = vpfe_g_fmt_vid_cap,
+ 	.vidioc_enum_fmt_vid_cap = vpfe_enum_fmt_vid_cap,
+ 	.vidioc_s_fmt_vid_cap    = vpfe_s_fmt_vid_cap,
++	.vidioc_s_fmt_type_private = vpfe_s_fmt_vid_cap,
+ 	.vidioc_try_fmt_vid_cap  = vpfe_try_fmt_vid_cap,
+ 	.vidioc_enum_input	 = vpfe_enum_input,
+ 	.vidioc_g_input		 = vpfe_g_input,
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h	2014-04-16 14:49:55.991579233 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h	2014-04-16 14:52:31.395579829 -0600
+@@ -144,6 +144,10 @@
+ 	u32 field_id;
+ 	/* flag to indicate whether decoder is initialized */
+ 	u8 initialized;
++    /* flag to indicate whether camera device is configured independently
++   * of the previewer. This flag is only used when the device is a
++   * camera */
++  unsigned char camera_configured;
+ 	/* TODO for MC. Previewer is always present if IMP is chained */
+ 	unsigned char imp_chained;
+ 	/* Resizer is chained at the output of previewer */

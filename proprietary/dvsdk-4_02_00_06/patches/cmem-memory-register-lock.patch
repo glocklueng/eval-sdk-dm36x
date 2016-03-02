@@ -1,0 +1,29 @@
+Index: dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/osal/linux/Memory_cmem.c
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/osal/linux/Memory_cmem.c	2011-03-24 16:05:12.000000000 -0600
++++ dvsdk-4_02_00_06/dvsdk/codec-engine_2_26_02_11/packages/ti/sdo/ce/osal/linux/Memory_cmem.c	2013-02-10 01:28:48.487283719 -0700
+@@ -972,7 +972,9 @@
+ Void Memory_registerContigBuf(UInt32 virtualAddress, UInt32 sizeInBytes,
+         UInt32 physicalAddress)
+ {
++    Lock_acquire( moduleLock );
+     addContigBuf(virtualAddress, sizeInBytes, physicalAddress);
++    Lock_release( moduleLock );
+ }
+ 
+ 
+@@ -981,12 +983,14 @@
+  */
+ Void Memory_unregisterContigBuf(UInt32 virtualAddress, UInt32 sizeInBytes)
+ {
++    Lock_acquire( moduleLock );
+     if (removeContigBuf(virtualAddress, sizeInBytes) < 0) {
+         GT_2trace(curTrace, GT_6CLASS, "Memory_unregisterContigBuf> "
+                   "Warning: buffer (addr=%d, size=%d) not found in "
+                   "translation cache\n",
+                   virtualAddress, sizeInBytes);
+     }
++    Lock_release( moduleLock );
+ }
+ 
+ 

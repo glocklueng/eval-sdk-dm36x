@@ -1,0 +1,13 @@
+Index: gst-dmai-plugins/src/src/gsttidmaivideosink.c
+===================================================================
+--- gst-dmai-plugins.orig/src/src/gsttidmaivideosink.c	2013-08-08 14:00:18.063185205 -0600
++++ gst-dmai-plugins/src/src/gsttidmaivideosink.c	2013-08-08 14:27:35.607118726 -0600
+@@ -354,7 +352,7 @@
+             sink->xPosition = (g_value_get_int(value) & ~0x1);
+             /*Handling negative and positive number*/
+             sink->xPosition = 
+-              sink->xPosition % 2 ? sink->xPosition++:sink->xPosition;
++              sink->xPosition % 2 ? (sink->xPosition + 1):sink->xPosition;
+             gst_tidmaivideosink_clean_DisplayBuf(sink);
+             break;
+         case PROP_Y_POSITION:

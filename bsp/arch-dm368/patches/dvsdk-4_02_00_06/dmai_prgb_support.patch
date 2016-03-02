@@ -1,0 +1,60 @@
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/VideoStd.c
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/VideoStd.c
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/VideoStd.c
+@@ -30,6 +30,10 @@
+  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  * --/COPYRIGHT--*/
+ 
++#include <fcntl.h>
++#include <unistd.h>
++#include <stdio.h>
++#include <stdlib.h>
+ #include <xdc/std.h>
+ #include <ti/sdo/dmai/VideoStd.h>
+ 
+@@ -46,6 +50,22 @@
+             *widthPtr  = VideoStd_QVGA_WIDTH;
+             *heightPtr = VideoStd_QVGA_HEIGHT;
+             break;
++		case VideoStd_PRGB:{
++			int fd;
++			char buf[4];
++
++			fd = open(VideoStd_PRGB_WIDTH_FILE, O_RDWR);
++			read(fd, &buf, 4);
++			close(fd);
++			*widthPtr = atoi(buf);
++
++			fd = open(VideoStd_PRGB_HEIGHT_FILE, O_RDWR);
++			read(fd, &buf, 4);
++			close(fd);
++			*heightPtr = atoi(buf);
++
++            break;
++		}
+         case VideoStd_CIF:
+             *widthPtr  = VideoStd_CIF_WIDTH;
+             *heightPtr = VideoStd_CIF_HEIGHT;
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/VideoStd.h
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/VideoStd.h
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/VideoStd.h
+@@ -48,6 +48,9 @@
+ #define VideoStd_QVGA_WIDTH       320     /**< Width in pixels of QVGA */
+ #define VideoStd_QVGA_HEIGHT      240     /**< Height in pixels of QVGA */
+ 
++#define VideoStd_PRGB_WIDTH_FILE	"/sys/class/davinci_display/prgb/width"
++#define VideoStd_PRGB_HEIGHT_FILE	"/sys/class/davinci_display/prgb/height"
++
+ #define VideoStd_CIF_WIDTH       352     /**< Width in pixels of CIF */
+ #define VideoStd_CIF_HEIGHT      288     /**< Height in pixels of CIF */
+ 
+@@ -102,6 +105,7 @@
+     VideoStd_1080P_25,      /**< 1080P @ 25 frames per second */
+     VideoStd_1080P_24,      /**< 1080P @ 24 frames per second */
+     VideoStd_QVGA,          /**< QVGA @ 30 frames per second */
++	VideoStd_PRGB,          /**< PRGB @ 30 frames per second */
+     VideoStd_1080P_60,      /**< 1080P @ 60 frames per second */
+     VideoStd_1080P_50,      /**< 1080P @ 50 frames per second */    
+     VideoStd_1080I_60,      /**< 1080I @ 60 frames per second */    

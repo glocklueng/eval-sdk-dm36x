@@ -1,0 +1,622 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/MAKEALL
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/MAKEALL	2011-03-24 18:27:05.000000000 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/MAKEALL	2011-06-10 10:49:28.199464467 -0600
+@@ -383,6 +383,7 @@
+ 	davinci_sonata		\
+ 	davinci_dm355evm	\
+ 	davinci_dm355leopard	\
++	davinci_dm368leopard	\
+ 	davinci_dm365evm	\
+ 	davinci_dm6467evm	\
+ "
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/Makefile
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/Makefile	2011-03-24 18:27:05.000000000 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/Makefile	2011-06-10 10:49:28.199464467 -0600
+@@ -950,6 +950,9 @@
+ davinci_dm355leopard_config :	unconfig
+ 	@$(MKCONFIG) $(@:_config=) arm arm926ejs dm355leopard davinci davinci
+ 
++davinci_dm368leopard_config :	unconfig
++	@$(MKCONFIG) $(@:_config=) arm arm926ejs dm368leopard davinci davinci
++
+ davinci_dm365evm_config :	unconfig
+ 	@$(MKCONFIG) $(@:_config=) arm arm926ejs dm365evm davinci davinci
+ 
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/board/davinci/dm368leopard/Makefile
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/board/davinci/dm368leopard/Makefile	2011-06-10 10:49:28.199464467 -0600
+@@ -0,0 +1,52 @@
++#
++# (C) Copyright 2000, 2001, 2002
++# Wolfgang Denk, DENX Software Engineering, wd@denx.de.
++#
++# Copyright (C) 2007 Sergey Kubushyn <ksi@koi8.net>
++#
++# See file CREDITS for list of people who contributed to this
++# project.
++#
++# This program is free software; you can redistribute it and/or
++# modify it under the terms of the GNU General Public License as
++# published by the Free Software Foundation; either version 2 of
++# the License, or (at your option) any later version.
++#
++# This program is distributed in the hope that it will be useful,
++# but WITHOUT ANY WARRANTY; without even the implied warranty of
++# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++# GNU General Public License for more details.
++#
++# You should have received a copy of the GNU General Public License
++# along with this program; if not, write to the Free Software
++# Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++# MA 02111-1307 USA
++#
++
++include $(TOPDIR)/config.mk
++
++LIB	= $(obj)lib$(BOARD).o
++
++COBJS	:= $(BOARD).o
++SOBJS	:=
++
++SRCS	:= $(SOBJS:.o=.S) $(COBJS:.o=.c)
++OBJS	:= $(addprefix $(obj),$(COBJS))
++SOBJS	:= $(addprefix $(obj),$(SOBJS))
++
++$(LIB):	$(obj).depend $(OBJS) $(SOBJS)
++	$(AR) $(ARFLAGS) $@ $(OBJS) $(SOBJS)
++
++clean:
++	rm -f $(SOBJS) $(OBJS)
++
++distclean:	clean
++	rm -f $(LIB) core *.bak $(obj).depend
++
++#########################################################################
++# This is for $(obj).depend target
++include $(SRCTREE)/rules.mk
++
++sinclude $(obj).depend
++
++#########################################################################
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/board/davinci/dm368leopard/config.mk
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/board/davinci/dm368leopard/config.mk	2011-06-10 10:49:28.199464467 -0600
+@@ -0,0 +1,6 @@
++# Linux Kernel is expected to be at 8000'8000, entry 8000'8000
++# (mem base + reserved)
++#
++
++#Provide at least 16MB spacing between us and the Linux Kernel image
++CONFIG_SYS_TEXT_BASE = 0x81080000
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/board/davinci/dm368leopard/dm368leopard.c
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/board/davinci/dm368leopard/dm368leopard.c	2011-06-10 10:49:28.203464962 -0600
+@@ -0,0 +1,197 @@
++/*
++ * Copyright (C) 2010 RidgeRun
++ *
++ * Author: Pablo Barrantes <pablo.barrantes@ridgerun.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
++ */
++
++#include <common.h>
++#include <nand.h>
++#include <asm/io.h>
++#include <asm/arch/hardware.h>
++#include <asm/arch/emif_defs.h>
++#include <asm/arch/nand_defs.h>
++#include <asm/arch/gpio_defs.h>
++#include <netdev.h>
++#include "../common/misc.h"
++#ifdef CONFIG_DAVINCI_MMC
++#include <mmc.h>
++#include <asm/arch/sdmmc_defs.h>
++#endif
++
++DECLARE_GLOBAL_DATA_PTR;
++
++int board_init(void)
++{
++	int i=0;
++
++	struct davinci_gpio *gpio1_base =
++			(struct davinci_gpio *)DAVINCI_GPIO_BANK01;
++	struct davinci_gpio *gpio23_base =
++			(struct davinci_gpio *)DAVINCI_GPIO_BANK23;
++
++	gd->bd->bi_arch_number = MACH_TYPE_DM368_LEOPARD;
++	gd->bd->bi_boot_params = PHYS_SDRAM_1 + 0x100;
++
++
++	/* PINMUX2: Enable AEMIF pins and GPIO[64:57] */
++	writel((readl(PINMUX2) & 0x00000015), PINMUX2);
++
++	/* Disable NAND write protection */
++	for(i=0; i < 20; i++) {
++		/* Configure GPIO59 as output */
++		writel((readl(&gpio23_base->dir) & ~(1 << 27)), &gpio23_base->dir);
++
++		/* GPIO 59 high */
++		writel((readl(&gpio23_base->out_data) | (1 << 27)), &gpio23_base->out_data);
++	}
++
++	/* Enable I2C bus */
++	REG(PINMUX3) |= 0x01400000;
++
++	/* Enable CLKOUT0 (CMOS_OE) */
++    /* Disable output CLKOUT0  */
++    REG(0x01C40048) |= 1;
++    /* Enable output CLKOUT0 */
++    REG(0x01C40048) &= ~1;
++    /* PLL1 enable output OBSCLK for CLKOUT0 */
++    REG(0x01C40800 + 0x148) |= 0x2;
++	/* PINMUX4 to select CLKOUT0 */
++    REG(PINMUX4) |= 0x00300000;
++
++	/* PINMUX4: Select GIO31 (CMOS_RST) & GIO36 (AIC31_RST), image sensor and audio codec reset */
++	REG(PINMUX4) &= 0xfff3fcff;
++
++	/* Reset image sensor */
++	for (i=0; i < 20; i++)
++	{
++		/* Configure GPIO31 as output */
++		writel((readl(&gpio1_base->dir) & ~(1 << 31)), &gpio1_base->dir);
++
++		/* GPIO 31 low */
++		writel((readl(&gpio1_base->out_data) | (0 << 31)),
++						&gpio1_base->out_data);
++
++		/* GPIO 31 high */
++		writel((readl(&gpio1_base->out_data) | (1 << 31)),
++						&gpio1_base->out_data);
++	}
++
++	/* Reset AIC3104 audio codec */
++	for (i=0; i < 20; i++)
++	{
++		/* Configure GPIO36 as output  */
++		writel((readl(&gpio23_base->dir) & ~(1 << 4)), &gpio23_base->dir);
++
++		/*GPIO 36 low */
++		writel((readl(&gpio23_base->out_data) | (0 << 4)),
++						&gpio23_base->out_data);
++
++		/*GPIO 36 high */
++		writel((readl(&gpio23_base->out_data) | (1 << 4)),
++						&gpio23_base->out_data);
++
++	}
++
++	return 0;
++}
++
++#ifdef CONFIG_DRIVER_TI_EMAC
++int board_eth_init(bd_t *bis)
++{
++	int i;
++	struct davinci_gpio *gpio1_base =
++			(struct davinci_gpio *)DAVINCI_GPIO_BANK01;
++
++	/* Configure PINMUX 3 to enable EMAC pins */
++	writel((readl(PINMUX3) | 0x1affff), PINMUX3);
++
++	/* Configure GPIO20 as output */
++	writel((readl(&gpio1_base->dir) & ~(1 << 20)), &gpio1_base->dir);
++
++	/* Toggle GPIO 20 */
++	for (i = 0; i < 20; i++) {
++		/* GPIO 20 low */
++		writel((readl(&gpio1_base->out_data) & ~(1 << 20)),
++						&gpio1_base->out_data);
++
++		udelay(1000);
++
++		/* GPIO 20 high */
++		writel((readl(&gpio1_base->out_data) | (1 << 20)),
++						&gpio1_base->out_data);
++	}
++
++	davinci_emac_initialize();
++
++	return 0;
++}
++#endif
++
++#ifdef CONFIG_NAND_DAVINCI
++int board_nand_init(struct nand_chip *nand)
++{
++	davinci_nand_init(nand);
++
++	return 0;
++}
++#endif
++#ifdef CONFIG_DAVINCI_MMC
++
++static struct davinci_mmc mmc_sd0 = {
++	.reg_base = (struct davinci_mmc_regs *)DAVINCI_MMC_SD0_BASE,
++	.input_clk = 121500000,
++	.host_caps = MMC_MODE_4BIT,
++	.voltages = MMC_VDD_32_33 | MMC_VDD_33_34,
++	.version = MMC_CTLR_VERSION_2,
++};
++
++#ifdef CONFIG_DAVINCI_MMC_SD1
++static struct davinci_mmc mmc_sd1 = {
++	.reg_base = (struct davinci_mmc_regs *)DAVINCI_MMC_SD1_BASE,
++	.input_clk = 121500000,
++	.host_caps = MMC_MODE_4BIT,
++	.voltages = MMC_VDD_32_33 | MMC_VDD_33_34,
++	.version = MMC_CTLR_VERSION_2,
++};
++#endif
++
++int board_mmc_init(bd_t *bis)
++{
++	int err;
++
++	/* Add slot-0 to mmc subsystem */
++	err = davinci_mmc_init(bis, &mmc_sd0);
++	if (err)
++		return err;
++
++#ifdef CONFIG_DAVINCI_MMC_SD1
++#define PUPDCTL1		0x01c4007c
++	/* PINMUX(4)-DAT0-3/CMD;  PINMUX(0)-CLK */
++	writel((readl(PINMUX4) | 0x55400000), PINMUX4);
++	writel((readl(PINMUX0) | 0x00010000), PINMUX0);
++
++	/* Configure MMC/SD pins as pullup */
++	writel((readl(PUPDCTL1) & ~0x07c0), PUPDCTL1);
++
++	/* Add slot-1 to mmc subsystem */
++	err = davinci_mmc_init(bis, &mmc_sd1);
++#endif
++
++	return err;
++}
++
++#endif
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm368leopard.h
+===================================================================
+--- /dev/null	1970-01-01 00:00:00.000000000 +0000
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm368leopard.h	2011-06-10 11:18:22.435344430 -0600
+@@ -0,0 +1,254 @@
++/*
++ * Copyright (C) 2010 RidgeRun
++ *
++ * Author: Pablo Barrantes <pablo.barrantes@ridgerun.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston,
++ * MA 02111-1307 USA
++ */
++
++#ifndef __CONFIG_H
++#define __CONFIG_H
++
++#define DAVINCI_DM368LEOPARD
++
++#define CONFIG_SKIP_LOWLEVEL_INIT	/* U-Boot is a 3rd stage loader */
++#define CONFIG_SYS_NO_FLASH		/* that is, no *NOR* flash */
++#define CONFIG_SYS_CONSOLE_INFO_QUIET
++#define	CONFIG_DISPLAY_CPUINFO
++
++/* SoC Configuration */
++#define CONFIG_ARM926EJS				/* arm926ejs CPU */
++#define CONFIG_SYS_TIMERBASE		0x01c21400	/* use timer 0 */
++#define CONFIG_SYS_HZ_CLOCK		24000000	/* timer0 freq */
++#define CONFIG_SYS_HZ			1000
++#define CONFIG_SOC_DM365
++
++/* Memory Info */
++#define CONFIG_NR_DRAM_BANKS		1
++#define PHYS_SDRAM_1			0x80000000
++#define PHYS_SDRAM_1_SIZE		(128 << 20)	/* 128 MiB */
++#define CONFIG_MAX_RAM_BANK_SIZE	(256 << 20)	/* Max supported */
++
++/* Serial Driver info: UART0 for console  */
++#define CONFIG_SYS_NS16550
++#define CONFIG_SYS_NS16550_SERIAL
++#define CONFIG_SYS_NS16550_REG_SIZE	-4
++#define CONFIG_SYS_NS16550_COM1		0x01c20000
++#define CONFIG_SYS_NS16550_CLK		CONFIG_SYS_HZ_CLOCK
++#define CONFIG_SYS_BAUDRATE_TABLE	{ 9600, 19200, 38400, 57600, 115200 }
++#define CONFIG_CONS_INDEX		1
++#define CONFIG_BAUDRATE			115200
++
++/* Network Configuration */
++#define CONFIG_DRIVER_TI_EMAC
++#define CONFIG_EMAC_MDIO_PHY_NUM	0
++#define CONFIG_MII
++#define CONFIG_BOOTP_DEFAULT
++#define CONFIG_BOOTP_DNS
++#define CONFIG_BOOTP_DNS2
++#define CONFIG_BOOTP_SEND_HOSTNAME
++#define CONFIG_NET_RETRY_COUNT	10
++#define CONFIG_NET_MULTI
++
++/* I2C */
++#define CONFIG_HARD_I2C
++#define CONFIG_DRIVER_DAVINCI_I2C
++#define CONFIG_SYS_I2C_SPEED		400000
++#define CONFIG_SYS_I2C_SLAVE		0x10	/* SMBus host address */
++
++/* NAND */
++#define CONFIG_NAND_DAVINCI
++#define CONFIG_SYS_NAND_CS		2
++#undef CONFIG_SYS_NAND_USE_FLASH_BBT
++#define CONFIG_SYS_NAND_4BIT_HW_ECC_OOBFIRST
++#define CONFIG_SYS_NAND_PAGE_2K
++
++#define CONFIG_SYS_NAND_LARGEPAGE
++#define CONFIG_SYS_NAND_BASE_LIST	{ 0x02000000, }
++#define CONFIG_SYS_MAX_NAND_DEVICE	1
++#define CONFIG_SYS_NAND_MAX_CHIPS	1
++
++/* SD/MMC */
++#define CONFIG_MMC
++#define CONFIG_GENERIC_MMC
++#define CONFIG_DAVINCI_MMC
++#define CONFIG_DAVINCI_MMC_SD1
++#define CONFIG_MMC_MBLOCK
++
++#define PINMUX4_USBDRVBUS_BITCLEAR       0x3000
++#define PINMUX4_USBDRVBUS_BITSET         0x2000
++
++/* USB Configuration */
++#define CONFIG_USB_DAVINCI
++#define CONFIG_MUSB_HCD
++
++#ifdef CONFIG_USB_DAVINCI
++#define CONFIG_CMD_USB         /* include support for usb      */
++#define CONFIG_CMD_STORAGE     /* include support for usb      */
++#define CONFIG_CMD_FAT         /* include support for FAT/storage*/
++#define CONFIG_DOS_PARTITION   /* include support for FAT/storage*/
++#endif
++
++#ifdef CONFIG_MUSB_HCD         /* include support for usb host */
++#define CONFIG_CMD_USB         /* include support for usb cmd */
++#define CONFIG_USB_STORAGE     /* MSC class support */
++#define CONFIG_CMD_STORAGE     /* inclue support for usb-storage cmd */
++#define CONFIG_CMD_FAT         /* inclue support for FAT/storage */
++#define CONFIG_DOS_PARTITION   /* inclue support for FAT/storage */
++
++#ifdef CONFIG_USB_KEYBOARD     /* HID class support */
++#define CONFIG_SYS_USB_EVENT_POLL
++
++#define CONFIG_PREBOOT "usb start"
++#endif /* CONFIG_USB_KEYBOARD */
++#endif /* CONFIG_MUSB_HCD */
++
++#ifdef CONFIG_MUSB_UDC
++#define CONFIG_USB_DEVICE              1
++#define CONFIG_USB_TTY                 1
++#define CONFIG_SYS_CONSOLE_IS_IN_ENV   1
++#define CONFIG_USBD_VENDORID           0x0451
++#define CONFIG_USBD_PRODUCTID          0x5678
++#define CONFIG_USBD_MANUFACTURER       "Texas Instruments"
++#define CONFIG_USBD_PRODUCT_NAME       "DM368Leopard"
++#endif /* CONFIG_MUSB_UDC */
++
++/* U-Boot command configuration */
++#include <config_cmd_default.h>
++
++#undef CONFIG_CMD_FLASH
++#undef CONFIG_CMD_FPGA
++#undef CONFIG_CMD_SETGETDCR
++
++#define CONFIG_CMD_CACHE
++#define CONFIG_CMD_ASKENV
++#define CONFIG_CMD_DHCP
++#define CONFIG_CMD_I2C
++#define CONFIG_CMD_PING
++#define CONFIG_CMD_SAVES
++
++#ifdef CONFIG_MMC
++#define CONFIG_DOS_PARTITION
++#define CONFIG_CMD_EXT2
++#define CONFIG_CMD_FAT
++#define CONFIG_CMD_MMC
++#endif
++
++#ifdef CONFIG_NAND_DAVINCI
++#define CONFIG_CMD_MTDPARTS
++#define CONFIG_MTD_PARTITIONS
++#define CONFIG_MTD_DEVICE
++#define CONFIG_CMD_NAND
++#define CONFIG_CMD_UBI
++#define CONFIG_RBTREE
++#endif
++
++#define CONFIG_CRC32_VERIFY
++#define CONFIG_MX_CYCLIC
++
++/* U-Boot general configuration */
++#undef CONFIG_USE_IRQ				/* No IRQ/FIQ in U-Boot */
++#define CONFIG_BOOTFILE		"uImage"	/* Boot file name */
++#define CONFIG_SYS_PROMPT	"DM368 LEOPARD # "
++#define CONFIG_SYS_CBSIZE	1024		/* Console I/O Buffer Size  */
++#define CONFIG_SYS_PBSIZE			/* Print buffer size */ \
++		(CONFIG_SYS_CBSIZE + sizeof(CONFIG_SYS_PROMPT) + 16)
++#define CONFIG_SYS_MAXARGS	32		/* max number of command args */
++#define CONFIG_SYS_HUSH_PARSER
++#define CONFIG_SYS_PROMPT_HUSH_PS2	"> "
++#define CONFIG_SYS_LONGHELP
++
++#ifdef CONFIG_NAND_DAVINCI
++#define CONFIG_ENV_SIZE		(256 << 10)	/* 256 KiB */
++#define CONFIG_ENV_IS_IN_NAND
++#define CONFIG_ENV_OFFSET	0x3C0000
++#undef CONFIG_ENV_IS_IN_FLASH
++#endif
++
++#if defined(CONFIG_MMC) && !defined(CONFIG_ENV_IS_IN_NAND)
++#define CONFIG_CMD_ENV
++#endif
++
++#define CONFIG_BOOTDELAY	3
++#define CONFIG_BOOTARGS \
++		"console=ttyS0,115200n8 " \
++		"root=/dev/mmcblk0p2 rw rootwait ip=off"
++
++#define CONFIG_EXTRA_ENV_SETTINGS \
++	"loadaddr=0x82000000\0" \
++	"loadbootenv=fatload mmc 0 ${loadaddr} uEnv.txt\0" \
++	"importbootenv=echo Importing environment from mmc ...; env import -t ${loadaddr} ${filesize}\0" \
++	"loaduimage=fatload mmc 0 ${loadaddr} uImage\0"
++
++#define CONFIG_BOOTCOMMAND \
++	"if mmc rescan 0 ; then " \
++		"if run loadbootenv ; then " \
++			"run importbootenv ; " \
++			"if test -n ${uenvcmd} ; then " \
++				"run uenvcmd; " \
++			"fi ;" \
++		"fi ;" \
++	"fi"
++
++#define CONFIG_CMDLINE_EDITING
++#define CONFIG_VERSION_VARIABLE
++#define CONFIG_TIMESTAMP
++
++/* U-Boot memory configuration */
++#define CONFIG_STACKSIZE		(256 << 10)	/* 256 KiB */
++#define CONFIG_SYS_MALLOC_LEN		(1 << 20)	/* 1 MiB */
++#define CONFIG_SYS_MEMTEST_START	0x87000000	/* physical address */
++#define CONFIG_SYS_MEMTEST_END		0x88000000	/* test 16MB RAM */
++
++/* Linux interfacing */
++#define CONFIG_CMDLINE_TAG
++#define CONFIG_SETUP_MEMORY_TAGS
++#define CONFIG_SYS_BARGSIZE	1024			/* bootarg Size */
++#define CONFIG_SYS_LOAD_ADDR	0x80700000		/* kernel address */
++
++
++/* NAND configuration issocketed with two chipselects just like the DM355 EVM.
++ * It normally comes with a 2GByte SLC part with 2KB pages
++ * (and 128KB erase blocks); other
++ * 2GByte parts may have 4KB pages, 256KB erase blocks, and use MLC.  (MLC
++ * pretty much demands the 4-bit ECC support.)  You can of course swap in
++ * other parts, including small page ones.
++ */
++#define MTDIDS_DEFAULT		"nand0=davinci_nand.0"
++
++#ifdef CONFIG_SYS_NAND_LARGEPAGE
++/*  Use same layout for 128K/256K blocks; allow some bad blocks */
++#define PART_BOOT		"2m(bootloader)ro,"
++#else
++/* Assume 16K erase blocks; allow a few bad ones. */
++#define PART_BOOT		"512k(bootloader)ro,"
++#endif
++
++#define PART_KERNEL		"4m(kernel),"	/* kernel + initramfs */
++#define PART_REST		"-(filesystem)"
++
++#define MTDPARTS_DEFAULT	\
++	"mtdparts=davinci_nand.0:" PART_BOOT PART_KERNEL PART_REST
++
++#define CONFIG_ETHADDR		"00:0C:0C:A0:02:b5"
++
++#define CONFIG_MAX_RAM_BANK_SIZE	(256 << 20)	/* 256 MB */
++
++#define CONFIG_SYS_SDRAM_BASE		PHYS_SDRAM_1
++#define CONFIG_SYS_INIT_SP_ADDR		\
++	(CONFIG_SYS_SDRAM_BASE + 0x1000 - GENERATED_GBL_DATA_SIZE)
++
++#endif /* __CONFIG_H */
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/drivers/usb/musb/davinci.c
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/drivers/usb/musb/davinci.c	2011-03-24 18:27:08.000000000 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/drivers/usb/musb/davinci.c	2011-06-10 10:49:28.203464962 -0600
+@@ -42,11 +42,11 @@
+ static u8 phy_on(void)
+ {
+ 	u32 timeout;
+-#ifdef DAVINCI_DM365EVM
++#ifdef DAVINCI_DM365EVM || DAVINCI_DM368LEOPARD
+ 	u32 val;
+ #endif
+ 	/* Wait until the USB phy is turned on */
+-#ifdef DAVINCI_DM365EVM
++#ifdef DAVINCI_DM365EVM || DAVINCI_DM368LEOPARD
+ 	writel(USBPHY_PHY24MHZ | USBPHY_SESNDEN |
+ 			USBPHY_VBDTCTEN, USBPHY_CTL_PADDR);
+ #else
+@@ -54,7 +54,7 @@
+ #endif
+ 	timeout = musb_cfg.timeout;
+ 
+-#ifdef DAVINCI_DM365EVM
++#ifdef DAVINCI_DM365EVM || DAVINCI_DM368LEOPARD
+ 	/* Set the ownership of GIO33 to USB */
+ 	val = readl(PINMUX4);
+ 	val &= ~(PINMUX4_USBDRVBUS_BITCLEAR);
+@@ -86,7 +86,7 @@
+ 	u32  revision;
+ 
+ 	/* enable USB VBUS */
+-#ifndef DAVINCI_DM365EVM
++#if !defined(DAVINCI_DM365EVM) && !defined(DAVINCI_DM368LEOPARD)
+ 	enable_vbus();
+ #endif
+ 	/* start the on-chip USB phy and its pll */
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/arch/arm/include/asm/mach-types.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/arch/arm/include/asm/mach-types.h	2011-03-24 18:27:07.000000000 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/arch/arm/include/asm/mach-types.h	2011-06-10 10:49:28.207464060 -0600
+@@ -3040,6 +3040,7 @@
+ #define MACH_TYPE_MSM8X60_QRDC         3060
+ #define MACH_TYPE_SPEAR900             3061
+ #define MACH_TYPE_PCONTROL_G20         3062
++#define MACH_TYPE_DM368_LEOPARD        3449
+ 
+ #ifdef CONFIG_ARCH_EBSA110
+ # ifdef machine_arch_type
+@@ -39377,6 +39378,18 @@
+ # define machine_is_pcontrol_g20()	(0)
+ #endif
+ 
++#ifdef CONFIG_MACH_DM368_LEOPARD
++# ifdef machine_arch_type
++#  undef machine_arch_type
++#  define machine_arch_type	__machine_arch_type
++# else
++#  define machine_arch_type	MACH_TYPE_DM368_LEOPARD
++# endif
++# define machine_is_dm368_leopard()	(machine_arch_type == MACH_TYPE_DM368_LEOPARD)
++#else
++# define machine_is_dm368_leopard()	(0)
++#endif
++
+ /*
+  * These have not yet been registered
+  */

@@ -1,0 +1,12 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.c	2011-12-01 14:41:29.949039739 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.c	2011-12-01 14:41:34.412424634 -0600
+@@ -519,7 +519,6 @@
+ 	struct ipipe_rsz_rescale_param *rsc_param =
+ 		&params->rsz_rsc_param[resize_no];
+ 
+-	printk(KERN_DEBUG "rsz_set_output_address %d\n", resize_no);
+ 	if (resize_no == RSZ_A)
+ 		rsz_start_add = RSZ_EN_A;
+ 	else

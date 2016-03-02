@@ -1,0 +1,22 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/tools/uflash/uflash.c
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/tools/uflash/uflash.c	2011-03-24 18:27:09.000000000 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/tools/uflash/uflash.c	2013-09-05 11:54:07.492230120 -0600
+@@ -155,7 +155,7 @@
+ 		close(devfd);
+ 		return -1;
+ 	}
+-	ubl_size = (ubl_size + BLOCK_SIZE - 1) & ~BLOCK_SIZE;
++	ubl_size = (ubl_size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
+ 	verbose_printf("UBL Size %d\n", ubl_size);
+ 
+ 	/* Get U-boot file size and round it to upper 512 byte boundary */
+@@ -165,7 +165,7 @@
+ 		close(devfd);
+ 		return -1;
+ 	}
+-	uboot_size = (uboot_size + BLOCK_SIZE - 1) & ~BLOCK_SIZE;
++	uboot_size = (uboot_size + BLOCK_SIZE - 1) & ~(BLOCK_SIZE - 1);
+ 	verbose_printf("U-Boot Size %d\n", uboot_size);
+ 
+ 	/* Get first partition start address offset from Master Boot Record */

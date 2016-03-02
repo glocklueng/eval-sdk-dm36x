@@ -1,0 +1,14 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/Makefile
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/Makefile	2013-08-07 15:47:44.605316372 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/Makefile	2013-08-07 15:50:41.589317052 -0600
+@@ -350,7 +350,8 @@
+ 		   -fno-strict-aliasing -fno-common \
+ 		   -Werror-implicit-function-declaration \
+ 		   -Wno-format-security \
+-		   -fno-delete-null-pointer-checks
++		   -fno-delete-null-pointer-checks \
++		   $(KBUILD_FLAGS)
+ KBUILD_AFLAGS   := -D__ASSEMBLY__
+ 
+ # Read KERNELRELEASE from include/config/kernel.release (if it exists)

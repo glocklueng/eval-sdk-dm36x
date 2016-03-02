@@ -1,0 +1,105 @@
+
+config ARCH_IPL_COPIES
+	string "Number of IPL copies to install to NAND"
+	default 24
+	help
+		Number of times the the IPL will be installed on different blocks of the 
+		NAND device. The ROM code inside the SoC will search on these blocks until
+		it finds a valid block.
+
+choice
+	prompt "Video output"
+
+config BTLR_SPLASH_COMPOSITE
+	 bool "Composite"
+
+config BTLR_SPLASH_LCD
+	 bool "LCD"
+
+endchoice
+
+choice
+	prompt "Output pattern "
+
+config BTLR_SPLASH_IMAGE
+	 bool "Splash Image"
+
+config BTLR_SPLASH_COLOR_BARS
+	 bool "Color Bars"
+
+endchoice
+
+config BTLR_SPLASH_ADDRESS
+	string "Splash image address"
+	default 0x80800000
+	help
+	    This is a memory location that should provide a double buffer for your
+	    splash image. Should be at least X_RES * Y_RES * Bytes per pixel * 2 long
+
+#
+# TI User Boot Loader
+# all definitions on this section must prefix with UBL_
+#
+
+comment "UBL - User Boot Loader"
+
+choice
+	prompt "Clock Frequencies"
+
+config UBL_ARM432_DDR340_OSC24
+       bool "DM368 ARM 432 Mhz DDR 340 Mhz OSC 24 Mhz"
+	help
+	    Configure PLL frequencies for normal DM368 usage.
+
+config UBL_ARM445_DDR351_OSC24
+       bool "HD DM368 ARM 445 Mhz DDR 351 Mhz OSC 24 Mhz"
+	help
+	    Configure PLL frequencies for DM368 to slighly overclock the ARM processor
+	    to create a 74.25 MHz clock that can be used by the video sub-system.  The ARM
+	    will be clocked at 445.5 Mhz (3.125% overclocking).  The 74.25MHz clock rate is 
+	    the high definition standard pixel rate for 720p60 and 1080i60.
+
+config UBL_ARM297_DDR270_OSC24
+       bool "DM365 - ARM 297 Mhz DDR 270 Mhz OSC 24 Mhz"
+	help
+	    Configure PLL frequencies for normal DM365 usage.
+
+config UBL_ARM297_DDR277_OSC27
+       bool "ARM 297 Mhz DDR 277 Mhz OSC 27 Mhz"
+	help
+	    Configure PLL frequencies for normal DM365 usage using
+	    27 Mhz crystal.  PLL configuration provided by TI,
+	    not tested by RidgeRun.
+
+config UBL_ARM270_DDR216_OSC24
+       bool "ARM 270 Mhz DDR 216 Mhz OSC 24 Mhz"
+	help
+	    Configure PLL frequencies for low power DM365 usage.
+	      PLL configuration provided by TI, not tested by RidgeRun.
+
+config UBL_ARM216_DDR173_OSC19P2
+       bool "ARM 216 Mhz DDR 173 Mhz OSC 19.2 Mhz"
+	help
+	    Configure PLL frequencies for low power DM365 usage.
+	      PLL configuration provided by TI, not tested by RidgeRun.
+
+config UBL_ARM216_DDR173_OSC24
+       bool "ARM 216 Mhz DDR 173 Mhz OSC 24 Mhz"
+	help
+	    Configure PLL frequencies for low power DM365 usage.
+	      PLL configuration provided by TI, not tested by RidgeRun.
+endchoice
+
+config UBL_TEST_MEMORY
+	bool "SDRAM memory test"
+	help
+	    Test SDRAM before is is used by the bootloader or kernel.  Takes around
+	    2 seconds per megabyte (at 400 Mhz).  Region of SDRAM to test controlled
+	    by CONFIG_BSP_ARCH_SDRAM_BASE and CONFIG_BSP_ARCH_SDRAM_SIZE.
+	    Intended hardware engineers debugging new board designs.
+
+config UBL_PRINT_CONFIGURATION
+	bool "Print UBL PLL and DRAM Configuration"
+	help
+	    Display key hardware registers controlling PLL and DRAM configuration.
+	    Intended hardware engineers debugging new board designs.

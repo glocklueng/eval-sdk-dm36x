@@ -1,0 +1,59 @@
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/_SysFs.c
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/_SysFs.c
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/_SysFs.c
+@@ -43,6 +43,8 @@
+ 
+ #define MODULE_NAME     "Dmai"
+ 
++#if 0
++
+ /* Strings for sysfs video output variables */
+ static Char *outputStrings[Display_Output_COUNT] = {
+     "SVIDEO",
+@@ -82,8 +84,11 @@
+     "1080I-30",
+ };
+ 
++#endif
++
+ #define SYSFS_FMT             "/sys/class/davinci_display/ch%d/output"
+ 
++#if 0
+ /******************************************************************************
+  * readSysFs
+  ******************************************************************************/
+@@ -118,7 +123,9 @@
+ 
+     return Dmai_EOK;
+ }
++#endif
+ 
++#if 0
+ /******************************************************************************
+  * writeSysFs
+  ******************************************************************************/
+@@ -168,13 +175,14 @@
+ 
+     return Dmai_EOK;
+ }
+-
++#endif
+ 
+ /******************************************************************************
+  * _SysFs_setup (INTERNAL)
+  ******************************************************************************/
+ Int _SysFs_setup(Display_Attrs *attrs)
+ {
++#if 0
+     Char sysfsFileName[MAX_SYSFS_PATH_LEN];
+     Char sysfsValue[MAX_SYSFS_VALUE_LEN];
+     Int  sysfsVideoStd;
+@@ -254,6 +262,7 @@
+         }
+     }
+ 
++#endif
+ 
+     return Dmai_EOK;
+ }

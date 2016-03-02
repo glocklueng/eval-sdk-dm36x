@@ -1,0 +1,18 @@
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/ce/Venc1.c
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/ce/Venc1.c	2014-07-15 13:39:53.297252088 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/ce/Venc1.c	2014-07-15 13:50:55.849257334 -0600
+@@ -136,9 +136,12 @@
+     if (BufferGfx_getColorSpace(hInBuf) == ColorSpace_YUV420PSEMI) {
+         inBufDesc.bufDesc[0].bufSize    = hVe->minInBufSize[0];
+         inBufDesc.bufDesc[1].bufSize    = hVe->minInBufSize[1];
++        /* Chroma offset*/
++        offset = (dim.y/2 * dim.lineLength) + (dim.x * (bpp >> 3))
++                 +  Buffer_getSize(hInBuf) * 2/3;
+ 
+         inBufDesc.bufDesc[0].buf        = inPtr;
+-        inBufDesc.bufDesc[1].buf        = inPtr + Buffer_getSize(hInBuf) * 2/3;
++        inBufDesc.bufDesc[1].buf        = Buffer_getUserPtr(hInBuf) + offset;
+         inBufDesc.numBufs               = 2;
+     }
+     else if (BufferGfx_getColorSpace(hInBuf) == ColorSpace_UYVY) {

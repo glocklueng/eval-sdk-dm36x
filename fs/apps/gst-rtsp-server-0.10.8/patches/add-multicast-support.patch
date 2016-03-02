@@ -1,0 +1,839 @@
+Index: gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-media-factory.c
+===================================================================
+--- gst-rtsp-server-0.10.8.orig/src/gst/rtsp-server/rtsp-media-factory.c	2011-01-12 11:14:34.000000000 -0600
++++ gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-media-factory.c	2014-10-29 07:43:07.871729246 -0600
+@@ -22,6 +22,8 @@
+ #define DEFAULT_LAUNCH         NULL
+ #define DEFAULT_SHARED         FALSE
+ #define DEFAULT_EOS_SHUTDOWN   FALSE
++#define DEFAULT_PROTOCOLS       GST_RTSP_LOWER_TRANS_UDP | GST_RTSP_LOWER_TRANS_TCP
++#define DEFAULT_MULTICAST_GROUP "224.2.0.1"
+ 
+ enum
+ {
+@@ -29,12 +31,22 @@
+   PROP_LAUNCH,
+   PROP_SHARED,
+   PROP_EOS_SHUTDOWN,
++  PROP_PROTOCOLS,
++  PROP_MULTICAST_GROUP,
+   PROP_LAST
+ };
+ 
++enum
++{
++  SIGNAL_MEDIA_CONSTRUCTED,
++  SIGNAL_LAST
++};
++
+ GST_DEBUG_CATEGORY_STATIC (rtsp_media_debug);
+ #define GST_CAT_DEFAULT rtsp_media_debug
+ 
++static guint gst_rtsp_media_factory_signals[SIGNAL_LAST] = { 0 };
++
+ static void gst_rtsp_media_factory_get_property (GObject * object, guint propid,
+     GValue * value, GParamSpec * pspec);
+ static void gst_rtsp_media_factory_set_property (GObject * object, guint propid,
+@@ -96,6 +108,22 @@
+           "Send EOS down the pipeline before shutting down",
+           DEFAULT_EOS_SHUTDOWN, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
++  g_object_class_install_property (gobject_class, PROP_PROTOCOLS,
++      g_param_spec_flags ("protocols", "Protocols",
++          "Allowed lower transport protocols", GST_TYPE_RTSP_LOWER_TRANS,
++          DEFAULT_PROTOCOLS, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++
++  g_object_class_install_property (gobject_class, PROP_MULTICAST_GROUP,
++      g_param_spec_string ("multicast-group", "Multicast Group",
++          "The Multicast group to send media to",
++          DEFAULT_MULTICAST_GROUP, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++
++  gst_rtsp_media_factory_signals[SIGNAL_MEDIA_CONSTRUCTED] =
++      g_signal_new ("media-constructed", G_TYPE_FROM_CLASS (klass),
++      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstRTSPMediaFactoryClass,
++          media_constructed), NULL, NULL, g_cclosure_marshal_VOID__OBJECT,
++      G_TYPE_NONE, 1, GST_TYPE_RTSP_MEDIA);
++
+   klass->gen_key = default_gen_key;
+   klass->get_element = default_get_element;
+   klass->construct = default_construct;
+@@ -112,6 +140,8 @@
+   factory->launch = g_strdup (DEFAULT_LAUNCH);
+   factory->shared = DEFAULT_SHARED;
+   factory->eos_shutdown = DEFAULT_EOS_SHUTDOWN;
++  factory->protocols = DEFAULT_PROTOCOLS;
++  factory->multicast_group = g_strdup (DEFAULT_MULTICAST_GROUP);
+ 
+   factory->lock = g_mutex_new ();
+   factory->medias_lock = g_mutex_new ();
+@@ -127,6 +157,7 @@
+   g_hash_table_unref (factory->medias);
+   g_mutex_free (factory->medias_lock);
+   g_free (factory->launch);
++  g_free (factory->multicast_group);
+   g_mutex_free (factory->lock);
+   if (factory->auth)
+     g_object_unref (factory->auth);
+@@ -151,6 +182,13 @@
+       g_value_set_boolean (value,
+           gst_rtsp_media_factory_is_eos_shutdown (factory));
+       break;
++     case PROP_PROTOCOLS:
++      g_value_set_flags (value, gst_rtsp_media_factory_get_protocols (factory));
++      break;
++    case PROP_MULTICAST_GROUP:
++	  g_value_take_string (value,
++		  gst_rtsp_media_factory_get_multicast_group (factory));
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, propid, pspec);
+   }
+@@ -173,6 +211,13 @@
+       gst_rtsp_media_factory_set_eos_shutdown (factory,
+           g_value_get_boolean (value));
+       break;
++    case PROP_PROTOCOLS:
++      gst_rtsp_media_factory_set_protocols (factory, g_value_get_flags (value));
++      break;
++    case PROP_MULTICAST_GROUP:
++      gst_rtsp_media_factory_set_multicast_group (factory,
++          g_value_get_string (value));
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, propid, pspec);
+   }
+@@ -329,6 +374,48 @@
+   return result;
+ }
+ 
++ /**
++ * gst_rtsp_media_factory_set_multicast_group:
++ * @factory: a #GstRTSPMedia
++ * @mc: the new multicast group
++ *
++ * Set the multicast group that media from @factory will be streamed to.
++ */
++void
++gst_rtsp_media_factory_set_multicast_group (GstRTSPMediaFactory * factory,
++    const gchar * mc)
++{
++  g_return_if_fail (GST_IS_RTSP_MEDIA_FACTORY (factory));
++
++  GST_RTSP_MEDIA_FACTORY_LOCK (factory);
++  g_free (factory->multicast_group);
++  factory->multicast_group = g_strdup (mc);
++  GST_RTSP_MEDIA_FACTORY_UNLOCK (factory);
++  GST_INFO_OBJECT (factory, "EGR DEBUG multicast-group=%s", factory->multicast_group);
++}
++
++/**
++ * gst_rtsp_media_factory_get_multicast_group:
++ * @factory: a #GstRTSPMedia
++ *
++ * Get the multicast group that media from @factory will be streamed to.
++ *
++ * Returns: the multicast group
++ */
++gchar *
++gst_rtsp_media_factory_get_multicast_group (GstRTSPMediaFactory * factory)
++{
++  gchar *result;
++
++  g_return_val_if_fail (GST_IS_RTSP_MEDIA_FACTORY (factory), NULL);
++
++  GST_RTSP_MEDIA_FACTORY_LOCK (factory);
++  result = g_strdup (factory->multicast_group);
++  GST_RTSP_MEDIA_FACTORY_UNLOCK (factory);
++
++  return result;
++}
++
+ /**
+  * gst_rtsp_media_factory_set_auth:
+  * @factory: a #GstRTSPMediaFactory
+@@ -377,6 +464,40 @@
+   return result;
+ }
+ 
++/**
++ * gst_rtsp_media_factory_set_protocols:
++ * @factory: a #GstRTSPMediaFactory
++ * @protocols: the new flags
++ *
++ * Configure the allowed lower transport for @factory.
++ */
++void
++gst_rtsp_media_factory_set_protocols (GstRTSPMediaFactory * factory,
++    GstRTSPLowerTrans protocols)
++{
++  g_return_if_fail (GST_IS_RTSP_MEDIA_FACTORY (factory));
++
++  factory->protocols = protocols;
++}
++
++/**
++ * gst_rtsp_media_factory_get_protocols:
++ * @factory: a #GstRTSPMediaFactory
++ *
++ * Get the allowed protocols of @factory.
++ *
++ * Returns: a #GstRTSPLowerTrans
++ */
++GstRTSPLowerTrans
++gst_rtsp_media_factory_get_protocols (GstRTSPMediaFactory * factory)
++{
++  g_return_val_if_fail (GST_IS_RTSP_MEDIA_FACTORY (factory),
++      GST_RTSP_LOWER_TRANS_UNKNOWN);
++
++  return factory->protocols;
++}
++
++
+ static gboolean
+ compare_media (gpointer key, GstRTSPMedia * media1, GstRTSPMedia * media2)
+ {
+@@ -434,9 +555,13 @@
+ 
+   if (media == NULL) {
+     /* nothing cached found, try to create one */
+-    if (klass->construct)
++    if (klass->construct) {
+       media = klass->construct (factory, url);
+-    else
++      if (media)
++        g_signal_emit (factory,
++            gst_rtsp_media_factory_signals[SIGNAL_MEDIA_CONSTRUCTED], 0, media,
++            NULL);
++    } else
+       media = NULL;
+ 
+     if (media) {
+@@ -660,18 +785,26 @@
+ {
+   gboolean shared, eos_shutdown;
+   GstRTSPAuth *auth;
++  gchar *mc;
++  GstRTSPLowerTrans protocols;
+ 
+   /* configure the sharedness */
+   GST_RTSP_MEDIA_FACTORY_LOCK (factory);
+   shared = factory->shared;
+   eos_shutdown = factory->eos_shutdown;
++  protocols = factory->protocols;
+   GST_RTSP_MEDIA_FACTORY_UNLOCK (factory);
+ 
+   gst_rtsp_media_set_shared (media, shared);
+   gst_rtsp_media_set_eos_shutdown (media, eos_shutdown);
++  gst_rtsp_media_set_protocols (media, protocols);
+ 
+   if ((auth = gst_rtsp_media_factory_get_auth (factory))) {
+     gst_rtsp_media_set_auth (media, auth);
+     g_object_unref (auth);
+   }
++  if ((mc = gst_rtsp_media_factory_get_multicast_group (factory))) {
++    gst_rtsp_media_set_multicast_group (media, mc);
++    g_free (mc);
++  }
+ }
+Index: gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-media-factory.h
+===================================================================
+--- gst-rtsp-server-0.10.8.orig/src/gst/rtsp-server/rtsp-media-factory.h	2011-01-12 06:18:02.000000000 -0600
++++ gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-media-factory.h	2014-10-29 07:43:24.215996149 -0600
+@@ -52,6 +52,10 @@
+  * @shared: if media from this factory can be shared between clients
+  * @media_lock: mutex protecting the medias.
+  * @media: hashtable of shared media
++ * @eos_shutdown: if shutdown should first send EOS to the pipeline
++ * @auth: the authentication manager
++ * @protocols: allowed transport protocols
++ * @multicast_group: the multicast group to send to
+  *
+  * The definition and logic for constructing the pipeline for a media. The media
+  * can contain multiple streams like audio and video.
+@@ -64,6 +68,8 @@
+   gboolean      shared;
+   gboolean      eos_shutdown;
+   GstRTSPAuth  *auth;
++  GstRTSPLowerTrans  protocols;
++  gchar        *multicast_group;
+ 
+   GMutex       *medias_lock;
+   GHashTable   *medias;
+@@ -98,6 +104,9 @@
+   GstRTSPMedia *    (*construct)      (GstRTSPMediaFactory *factory, const GstRTSPUrl *url);
+   void              (*configure)      (GstRTSPMediaFactory *factory, GstRTSPMedia *media);
+   GstElement *      (*create_pipeline)(GstRTSPMediaFactory *factory, GstRTSPMedia *media);
++
++  /* signals */
++  void            (*media_constructed)  (GstRTSPMediaFactory *factory, GstRTSPMedia *media);
+ };
+ 
+ GType                 gst_rtsp_media_factory_get_type     (void);
+@@ -118,6 +127,13 @@
+                                                                  gboolean eos_shutdown);
+ gboolean              gst_rtsp_media_factory_is_eos_shutdown    (GstRTSPMediaFactory *factory);
+ 
++void                  gst_rtsp_media_factory_set_protocols  (GstRTSPMediaFactory *factory, GstRTSPLowerTrans protocols);
++
++GstRTSPLowerTrans     gst_rtsp_media_factory_get_protocols  (GstRTSPMediaFactory *factory);
++
++void                  gst_rtsp_media_factory_set_multicast_group (GstRTSPMediaFactory * factory, const gchar *mc);
++gchar *               gst_rtsp_media_factory_get_multicast_group (GstRTSPMediaFactory * factory);
++
+ void                  gst_rtsp_media_factory_set_auth     (GstRTSPMediaFactory *factory, GstRTSPAuth *auth);
+ GstRTSPAuth *         gst_rtsp_media_factory_get_auth     (GstRTSPMediaFactory *factory);
+ 
+Index: gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-client.c
+===================================================================
+--- gst-rtsp-server-0.10.8.orig/src/gst/rtsp-server/rtsp-client.c	2011-01-12 08:37:38.000000000 -0600
++++ gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-client.c	2014-10-29 07:42:32.699099776 -0600
+@@ -36,9 +36,6 @@
+ #include "rtsp-sdp.h"
+ #include "rtsp-params.h"
+ 
+-/* temporary multicast address until it's configurable somewhere */
+-#define MCAST_ADDRESS "224.2.0.1"
+-
+ static GMutex *tunnels_lock;
+ static GHashTable *tunnels;
+ 
+@@ -121,8 +118,12 @@
+ 
+   /* unlink all media managed in this session */
+   for (medias = session->medias; medias; medias = g_list_next (medias)) {
+-    unlink_session_streams (client, session,
+-        (GstRTSPSessionMedia *) medias->data);
++    GstRTSPSessionMedia *media = medias->data;
++
++    gst_rtsp_session_media_set_state (media, GST_STATE_NULL);
++    unlink_session_streams (client, session, media);
++    /* unmanage the media in the session. */
++    gst_rtsp_session_release_media (session, media);
+   }
+ }
+ 
+@@ -337,12 +338,14 @@
+       goto no_media;
+ 
+     g_object_unref (factory);
++    factory = NULL;
++    state->factory = NULL;
+ 
+     /* set ipv6 on the media before preparing */
+     media->is_ipv6 = client->is_ipv6;
+     state->media = media;
+ 
+-    /* prepare the media */
++	/* prepare the media */
+     if (!(gst_rtsp_media_prepare (media)))
+       goto no_prepare;
+ 
+@@ -389,7 +392,6 @@
+   {
+     send_generic_response (client, GST_RTSP_STS_SERVICE_UNAVAILABLE, state);
+     g_object_unref (media);
+-    g_object_unref (factory);
+     return NULL;
+   }
+ }
+@@ -852,7 +854,6 @@
+   gchar *trans_str, *pos;
+   guint streamid;
+   GstRTSPSessionMedia *media;
+-  GstRTSPUrl *url;
+ 
+   uri = state->uri;
+ 
+@@ -927,15 +928,6 @@
+   if (client->session_pool == NULL)
+     goto no_pool;
+ 
+-  /* we have a valid transport now, set the destination of the client. */
+-  g_free (ct->destination);
+-  if (ct->lower_transport == GST_RTSP_LOWER_TRANS_UDP_MCAST) {
+-    ct->destination = g_strdup (MCAST_ADDRESS);
+-  } else {
+-    url = gst_rtsp_connection_get_url (client->connection);
+-    ct->destination = g_strdup (url->host);
+-  }
+-
+   session = state->session;
+ 
+   if (session) {
+@@ -972,11 +964,21 @@
+ 
+   state->sessmedia = media;
+ 
+-  /* fix the transports */
+-  if (ct->lower_transport & GST_RTSP_LOWER_TRANS_TCP) {
+-    /* check if the client selected channels for TCP */
+-    if (ct->interleaved.min == -1 || ct->interleaved.max == -1) {
+-      gst_rtsp_session_media_alloc_channels (media, &ct->interleaved);
++  /* we have a valid transport now, set the destination of the client. */
++  g_free (ct->destination);
++  if (ct->lower_transport == GST_RTSP_LOWER_TRANS_UDP_MCAST) {
++    ct->destination = gst_rtsp_media_get_multicast_group (media->media);
++  } else {
++    GstRTSPUrl *url;
++
++    url = gst_rtsp_connection_get_url (client->connection);
++    ct->destination = g_strdup (url->host);
++
++    if (ct->lower_transport & GST_RTSP_LOWER_TRANS_TCP) {
++      /* check if the client selected channels for TCP */
++      if (ct->interleaved.min == -1 || ct->interleaved.max == -1) {
++        gst_rtsp_session_media_alloc_channels (media, &ct->interleaved);
++      }
+     }
+   }
+ 
+@@ -1068,6 +1070,7 @@
+   GstSDPMessage *sdp;
+   GstSDPInfo info;
+   const gchar *proto;
++  GstRTSPLowerTrans protocols;
+ 
+   gst_sdp_message_new (&sdp);
+ 
+@@ -1090,20 +1093,24 @@
+   gst_sdp_message_add_attribute (sdp, "control", "*");
+ 
+   info.server_proto = proto;
+-  if (media->protocols & GST_RTSP_LOWER_TRANS_UDP_MCAST)
+-    info.server_ip = MCAST_ADDRESS;
++  protocols = gst_rtsp_media_get_protocols (media);
++  if (protocols & GST_RTSP_LOWER_TRANS_UDP_MCAST)
++    info.server_ip = gst_rtsp_media_get_multicast_group (media);
+   else
+-    info.server_ip = client->server_ip;
++    info.server_ip = g_strdup (client->server_ip);
+ 
+   /* create an SDP for the media object */
+   if (!gst_rtsp_sdp_from_media (sdp, &info, media))
+     goto no_sdp;
+ 
++  g_free (info.server_ip);
++
+   return sdp;
+ 
+   /* ERRORS */
+ no_sdp:
+   {
++	g_free (info.server_ip);
+     gst_sdp_message_free (sdp);
+     return NULL;
+   }
+@@ -1594,7 +1601,7 @@
+   return result;
+ }
+ 
+-/**
++ /**
+  * gst_rtsp_client_set_auth:
+  * @client: a #GstRTSPClient
+  * @auth: a #GstRTSPAuth
+@@ -1666,9 +1673,9 @@
+ static GstRTSPResult
+ message_sent (GstRTSPWatch * watch, guint cseq, gpointer user_data)
+ {
+-  GstRTSPClient *client;
++  /* GstRTSPClient *client; */
+ 
+-  client = GST_RTSP_CLIENT (user_data);
++  /* client = GST_RTSP_CLIENT (user_data); */
+ 
+   /* GST_INFO ("client %p: sent a message with cseq %d", client, cseq); */
+ 
+Index: gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-sdp.h
+===================================================================
+--- gst-rtsp-server-0.10.8.orig/src/gst/rtsp-server/rtsp-sdp.h	2010-03-16 10:42:34.000000000 -0600
++++ gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-sdp.h	2014-10-29 07:44:31.276934005 -0600
+@@ -29,7 +29,7 @@
+ 
+ typedef struct {
+   const gchar *server_proto;
+-  const gchar *server_ip;
++  gchar *server_ip;
+ } GstSDPInfo;
+ 
+ /* creating SDP */
+Index: gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-media.c
+===================================================================
+--- gst-rtsp-server-0.10.8.orig/src/gst/rtsp-server/rtsp-media.c	2011-01-13 11:56:37.000000000 -0600
++++ gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-media.c	2014-10-29 07:54:21.563411449 -0600
+@@ -31,6 +31,7 @@
+ #define DEFAULT_PROTOCOLS      GST_RTSP_LOWER_TRANS_UDP | GST_RTSP_LOWER_TRANS_TCP
+ //#define DEFAULT_PROTOCOLS      GST_RTSP_LOWER_TRANS_UDP_MCAST
+ #define DEFAULT_EOS_SHUTDOWN   FALSE
++#define DEFAULT_MULTICAST_GROUP "224.2.0.1"
+ 
+ /* define to dump received RTCP packets */
+ #undef DUMP_STATS
+@@ -42,6 +43,7 @@
+   PROP_REUSABLE,
+   PROP_PROTOCOLS,
+   PROP_EOS_SHUTDOWN,
++  PROP_MULTICAST_GROUP,
+   PROP_LAST
+ };
+ 
+@@ -106,6 +108,11 @@
+           "Send an EOS event to the pipeline before unpreparing",
+           DEFAULT_EOS_SHUTDOWN, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
++  g_object_class_install_property (gobject_class, PROP_MULTICAST_GROUP,
++	  g_param_spec_string ("multicast-group", "Multicast Group",
++		  "The Multicast group to send media to",
++		  DEFAULT_MULTICAST_GROUP, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++
+   gst_rtsp_media_signals[SIGNAL_PREPARED] =
+       g_signal_new ("prepared", G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST,
+       G_STRUCT_OFFSET (GstRTSPMediaClass, prepared), NULL, NULL,
+@@ -150,6 +157,7 @@
+   media->reusable = DEFAULT_REUSABLE;
+   media->protocols = DEFAULT_PROTOCOLS;
+   media->eos_shutdown = DEFAULT_EOS_SHUTDOWN;
++  media->multicast_group = g_strdup (DEFAULT_MULTICAST_GROUP);
+ }
+ 
+ /* FIXME. this should be done in multiudpsink */
+@@ -226,9 +234,6 @@
+ 
+   g_list_free (stream->transports);
+ 
+-  g_list_foreach (stream->destinations, (GFunc) free_destination, NULL);
+-  g_list_free (stream->destinations);
+-
+   g_free (stream);
+ }
+ 
+@@ -264,6 +269,7 @@
+     g_source_destroy (media->source);
+     g_source_unref (media->source);
+   }
++  g_free (media->multicast_group);
+   g_mutex_free (media->lock);
+   g_cond_free (media->cond);
+ 
+@@ -289,6 +295,9 @@
+     case PROP_EOS_SHUTDOWN:
+       g_value_set_boolean (value, gst_rtsp_media_is_eos_shutdown (media));
+       break;
++    case PROP_MULTICAST_GROUP:
++	  g_value_take_string (value, gst_rtsp_media_get_multicast_group (media));
++	  break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, propid, pspec);
+   }
+@@ -313,6 +322,9 @@
+     case PROP_EOS_SHUTDOWN:
+       gst_rtsp_media_set_eos_shutdown (media, g_value_get_boolean (value));
+       break;
++    case PROP_MULTICAST_GROUP:
++	  gst_rtsp_media_set_multicast_group (media, g_value_get_string (value));
++	  break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, propid, pspec);
+   }
+@@ -525,6 +537,46 @@
+   return media->eos_shutdown;
+ }
+ 
++ /**
++ * gst_rtsp_media_set_multicast_group:
++ * @media: a #GstRTSPMedia
++ * @mc: the new multicast group
++ *
++ * Set the multicast group that media from @media will be streamed to.
++ */
++void
++gst_rtsp_media_set_multicast_group (GstRTSPMedia * media, const gchar * mc)
++{
++  g_return_if_fail (GST_IS_RTSP_MEDIA (media));
++
++  g_mutex_lock (media->lock);
++  g_free (media->multicast_group);
++  media->multicast_group = g_strdup (mc);
++  g_mutex_unlock (media->lock);
++}
++
++/**
++ * gst_rtsp_media_get_multicast_group:
++ * @media: a #GstRTSPMedia
++ *
++ * Get the multicast group that media from @media will be streamed to.
++ *
++ * Returns: the multicast group
++ */
++gchar *
++gst_rtsp_media_get_multicast_group (GstRTSPMedia * media)
++{
++  gchar *result;
++
++  g_return_val_if_fail (GST_IS_RTSP_MEDIA (media), NULL);
++
++  g_mutex_lock (media->lock);
++  result = g_strdup (media->multicast_group);
++  g_mutex_unlock (media->lock);
++
++  return result;
++}
++
+ /**
+  * gst_rtsp_media_set_auth:
+  * @media: a #GstRTSPMedia
+@@ -898,10 +950,9 @@
+           "send-duplicates")) {
+     g_object_set (G_OBJECT (udpsink0), "send-duplicates", FALSE, NULL);
+     g_object_set (G_OBJECT (udpsink1), "send-duplicates", FALSE, NULL);
+-    stream->filter_duplicates = FALSE;
+   } else {
+-    GST_WARNING ("multiudpsink version found without send-duplicates property");
+-    stream->filter_duplicates = TRUE;
++    g_warning
++        ("old multiudpsink version found without send-duplicates property");
+   }
+ 
+   if (g_object_class_find_property (G_OBJECT_GET_CLASS (udpsink0),
+@@ -1443,7 +1494,6 @@
+ default_handle_message (GstRTSPMedia * media, GstMessage * message)
+ {
+   GstMessageType type;
+-
+   type = GST_MESSAGE_TYPE (message);
+ 
+   switch (type) {
+@@ -1811,83 +1861,26 @@
+ add_udp_destination (GstRTSPMedia * media, GstRTSPMediaStream * stream,
+     gchar * dest, gint min, gint max)
+ {
+-  gboolean do_add = TRUE;
+-  RTSPDestination *ndest;
+-
+-  if (stream->filter_duplicates) {
+-    RTSPDestination fdest;
+-    GList *find;
+-
+-    fdest.dest = dest;
+-    fdest.min = min;
+-    fdest.max = max;
+-
+-    /* first see if we already added this destination */
+-    find =
+-        g_list_find_custom (stream->destinations, &fdest,
+-        (GCompareFunc) dest_compare);
+-    if (find) {
+-      ndest = (RTSPDestination *) find->data;
+-
+-      GST_INFO ("already streaming to %s:%d-%d with %d clients", dest, min, max,
+-          ndest->count);
+-      ndest->count++;
+-      do_add = FALSE;
+-    }
+-  }
+-
+-  if (do_add) {
+-    GST_INFO ("adding %s:%d-%d", dest, min, max);
+-    g_signal_emit_by_name (stream->udpsink[0], "add", dest, min, NULL);
+-    g_signal_emit_by_name (stream->udpsink[1], "add", dest, max, NULL);
+-
+-    if (stream->filter_duplicates) {
+-      ndest = create_destination (dest, min, max);
+-      stream->destinations = g_list_prepend (stream->destinations, ndest);
+-    }
+-  }
++  GST_INFO ("adding %s:%d-%d", dest, min, max);
++  g_signal_emit_by_name (stream->udpsink[0], "add", dest, min, NULL);
++  g_signal_emit_by_name (stream->udpsink[1], "add", dest, max, NULL);
+ }
+ 
+ static void
+ remove_udp_destination (GstRTSPMedia * media, GstRTSPMediaStream * stream,
+     gchar * dest, gint min, gint max)
+ {
+-  gboolean do_remove = TRUE;
+-  RTSPDestination *ndest = NULL;
+-  GList *find = NULL;
+-
+-  if (stream->filter_duplicates) {
+-    RTSPDestination fdest;
+-
+-    fdest.dest = dest;
+-    fdest.min = min;
+-    fdest.max = max;
+-
+-    /* first see if we already added this destination */
+-    find =
+-        g_list_find_custom (stream->destinations, &fdest,
+-        (GCompareFunc) dest_compare);
+-    if (!find)
+-      return;
+-
+-    ndest = (RTSPDestination *) find->data;
+-    if (--ndest->count > 0) {
+-      do_remove = FALSE;
+-      GST_INFO ("still streaming to %s:%d-%d with %d clients", dest, min, max,
+-          ndest->count);
+-    }
+-  }
++  GST_INFO ("removing %s:%d-%d", dest, min, max);
++  g_signal_emit_by_name (stream->udpsink[0], "remove", dest, min, NULL);
++  g_signal_emit_by_name (stream->udpsink[1], "remove", dest, max, NULL);
++}
+ 
+-  if (do_remove) {
+-    GST_INFO ("removing %s:%d-%d", dest, min, max);
+-    g_signal_emit_by_name (stream->udpsink[0], "remove", dest, min, NULL);
+-    g_signal_emit_by_name (stream->udpsink[1], "remove", dest, max, NULL);
+-
+-    if (stream->filter_duplicates) {
+-      stream->destinations = g_list_delete_link (stream->destinations, find);
+-      free_destination (ndest);
+-    }
+-  }
++static void
++set_multicast_ttl (GstRTSPMedia * media, GstRTSPMediaStream * stream, guint ttl)
++{
++  GST_INFO ("setting ttl-mc %d", ttl);
++  g_object_set (G_OBJECT (stream->udpsink[0]), "ttl-mc", ttl, NULL);
++  g_object_set (G_OBJECT (stream->udpsink[1]), "ttl-mc", ttl, NULL);
+ }
+ 
+ /**
+@@ -1960,13 +1953,15 @@
+       case GST_RTSP_LOWER_TRANS_UDP:
+       case GST_RTSP_LOWER_TRANS_UDP_MCAST:
+       {
+-        gchar *dest;
++		gchar *dest;
+         gint min, max;
++        guint ttl = 0;
+ 
+         dest = trans->destination;
+         if (trans->lower_transport == GST_RTSP_LOWER_TRANS_UDP_MCAST) {
+-          min = trans->port.min;
++		  min = trans->port.min;
+           max = trans->port.max;
++          ttl = trans->ttl;
+         } else {
+           min = trans->client_port.min;
+           max = trans->client_port.max;
+@@ -1974,6 +1969,9 @@
+ 
+         if (add && !tr->active) {
+           add_udp_destination (media, stream, dest, min, max);
++          if (ttl > 0) {
++			set_multicast_ttl (media, stream, ttl);
++		  }
+           stream->transports = g_list_prepend (stream->transports, tr);
+           tr->active = TRUE;
+           media->active++;
+Index: gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-media.h
+===================================================================
+--- gst-rtsp-server-0.10.8.orig/src/gst/rtsp-server/rtsp-media.h	2011-01-12 06:25:49.000000000 -0600
++++ gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-media.h	2014-10-29 07:44:16.212750797 -0600
+@@ -142,11 +142,6 @@
+ 
+   /* transports we stream to */
+   GList        *transports;
+-
+-  /* to filter out duplicate destinations in case multiudpsink is too old to do
+-   * this for us */
+-  gboolean      filter_duplicates;
+-  GList        *destinations;
+ };
+ 
+ /**
+@@ -207,6 +202,7 @@
+   gboolean           is_ipv6;
+   gboolean           eos_shutdown;
+   GstRTSPAuth       *auth;
++  gchar 			*multicast_group;
+ 
+   GstElement        *element;
+   GArray            *streams;
+@@ -280,6 +276,9 @@
+ void                  gst_rtsp_media_set_eos_shutdown (GstRTSPMedia *media, gboolean eos_shutdown);
+ gboolean              gst_rtsp_media_is_eos_shutdown  (GstRTSPMedia *media);
+ 
++void 				  gst_rtsp_media_set_multicast_group (GstRTSPMedia *media, const gchar * mc);
++gchar * 			  gst_rtsp_media_get_multicast_group (GstRTSPMedia *media);
++
+ void                  gst_rtsp_media_set_auth         (GstRTSPMedia *media, GstRTSPAuth *auth);
+ GstRTSPAuth *         gst_rtsp_media_get_auth         (GstRTSPMedia *media);
+ 
+Index: gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-server.c
+===================================================================
+--- gst-rtsp-server-0.10.8.orig/src/gst/rtsp-server/rtsp-server.c	2011-01-19 08:29:47.000000000 -0600
++++ gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-server.c	2014-10-29 07:45:03.917051377 -0600
+@@ -57,11 +57,19 @@
+   PROP_LAST
+ };
+ 
++enum
++{
++  SIGNAL_CLIENT_CONNECTED,
++  SIGNAL_LAST
++};
++
+ G_DEFINE_TYPE (GstRTSPServer, gst_rtsp_server, G_TYPE_OBJECT);
+ 
+ GST_DEBUG_CATEGORY_STATIC (rtsp_server_debug);
+ #define GST_CAT_DEFAULT rtsp_server_debug
+ 
++static guint gst_rtsp_server_signals[SIGNAL_LAST] = { 0 };
++
+ static void gst_rtsp_server_get_property (GObject * object, guint propid,
+     GValue * value, GParamSpec * pspec);
+ static void gst_rtsp_server_set_property (GObject * object, guint propid,
+@@ -141,6 +149,12 @@
+           GST_TYPE_RTSP_MEDIA_MAPPING,
+           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
++  gst_rtsp_server_signals[SIGNAL_CLIENT_CONNECTED] =
++      g_signal_new ("client-connected", G_TYPE_FROM_CLASS (gobject_class),
++      G_SIGNAL_RUN_LAST, G_STRUCT_OFFSET (GstRTSPServerClass, client_connected),
++      NULL, NULL, g_cclosure_marshal_VOID__OBJECT, G_TYPE_NONE, 1,
++      gst_rtsp_client_get_type ());
++
+   klass->create_client = default_create_client;
+   klass->accept_client = default_accept_client;
+ 
+@@ -692,11 +706,13 @@
+ {
+   GST_DEBUG_OBJECT (server, "unmanage client %p", client);
+ 
++  g_object_ref (server);
+   gst_rtsp_client_set_server (client, NULL);
+ 
+   GST_RTSP_SERVER_LOCK (server);
+   server->clients = g_list_remove (server->clients, client);
+   GST_RTSP_SERVER_UNLOCK (server);
++  g_object_unref (server);
+ 
+   g_object_unref (client);
+ }
+@@ -793,6 +809,9 @@
+ 
+     /* manage the client connection */
+     manage_client (server, client);
++
++    g_signal_emit (server, gst_rtsp_server_signals[SIGNAL_CLIENT_CONNECTED], 0,
++        client);
+   } else {
+     GST_WARNING_OBJECT (server, "received unknown event %08x", condition);
+   }
+Index: gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-server.h
+===================================================================
+--- gst-rtsp-server-0.10.8.orig/src/gst/rtsp-server/rtsp-server.h	2011-01-12 11:46:41.000000000 -0600
++++ gst-rtsp-server-0.10.8/src/gst/rtsp-server/rtsp-server.h	2014-10-29 07:45:10.229073225 -0600
+@@ -89,6 +89,9 @@
+ 
+   GstRTSPClient * (*create_client) (GstRTSPServer *server);
+   gboolean        (*accept_client) (GstRTSPServer *server, GstRTSPClient *client, GIOChannel *channel);
++
++  /* signals */
++  void            (*client_connected)   (GstRTSPServer *server, GstRTSPClient *client);
+ };
+ 
+ GType                 gst_rtsp_server_get_type             (void);

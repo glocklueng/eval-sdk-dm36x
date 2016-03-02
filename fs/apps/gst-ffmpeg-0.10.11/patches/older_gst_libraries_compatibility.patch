@@ -1,0 +1,33 @@
+Index: gst-ffmpeg-0.10.11-new/src/ext/ffmpeg/gstffmpegdeinterlace.c
+===================================================================
+--- gst-ffmpeg-0.10.11-new.orig/src/ext/ffmpeg/gstffmpegdeinterlace.c	2011-04-20 15:39:32.888237267 -0600
++++ gst-ffmpeg-0.10.11-new/src/ext/ffmpeg/gstffmpegdeinterlace.c	2011-04-20 15:40:01.300171565 -0600
+@@ -142,7 +142,7 @@
+   srcCaps = gst_caps_copy (caps);
+   g_value_init (&interlaced, G_TYPE_BOOLEAN);
+   g_value_set_boolean (&interlaced, FALSE);
+-  gst_caps_set_value (srcCaps, "interlaced", &interlaced);
++  gst_caps_set_simple (srcCaps, "interlaced", &interlaced);
+   g_value_unset (&interlaced);
+ 
+   ret = gst_pad_set_caps (deinterlace->srcpad, srcCaps);
+Index: gst-ffmpeg-0.10.11-new/src/ext/ffmpeg/gstffmpegenc.c
+===================================================================
+--- gst-ffmpeg-0.10.11-new.orig/src/ext/ffmpeg/gstffmpegenc.c	2011-04-20 15:39:41.241419505 -0600
++++ gst-ffmpeg-0.10.11-new/src/ext/ffmpeg/gstffmpegenc.c	2011-04-20 15:40:18.443973004 -0600
+@@ -946,6 +946,7 @@
+        * forego some timestamp perfection in favour of upstream syncing
+        * (particularly in case these do not happen to come in multiple
+        * of frame size) */
++#if 0
+       upstream_time = gst_adapter_prev_timestamp (ffmpegenc->adapter, &bytes);
+       if (GST_CLOCK_TIME_IS_VALID (upstream_time)) {
+         GstClockTimeDiff diff;
+@@ -968,6 +969,7 @@
+           ffmpegenc->discont = TRUE;
+         }
+       }
++#endif
+     }
+ 
+     GST_LOG_OBJECT (ffmpegenc, "pushing buffer in adapter");

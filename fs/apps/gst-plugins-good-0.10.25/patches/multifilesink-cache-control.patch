@@ -1,0 +1,155 @@
+Index: gst-plugins-good-0.10.25/src/gst/multifile/gstmultifilesink.c
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/gst/multifile/gstmultifilesink.c	2013-02-14 09:47:53.021999396 -0700
++++ gst-plugins-good-0.10.25/src/gst/multifile/gstmultifilesink.c	2013-02-14 10:43:39.069364167 -0700
+@@ -109,6 +109,7 @@
+ #ifdef HAVE_CONFIG_H
+ #  include "config.h"
+ #endif
++#include <fcntl.h>
+ #include <gst/base/gstbasetransform.h>
+ #include <glib/gstdio.h>
+ #include "gstmultifilesink.h"
+@@ -125,7 +126,7 @@
+ #define DEFAULT_INDEX 0
+ #define DEFAULT_POST_MESSAGES FALSE
+ #define DEFAULT_NEXT_FILE GST_MULTI_FILE_SINK_NEXT_BUFFER
+-
++#define DEFAULT_CACHE_CONTROL GST_MULTI_FILE_SINK_CACHE_CONTROL_DEFAULT
+ enum
+ {
+   PROP_0,
+@@ -133,6 +134,7 @@
+   PROP_INDEX,
+   PROP_POST_MESSAGES,
+   PROP_NEXT_FILE,
++  PROP_CACHE_CONTROL,
+   PROP_LAST
+ };
+ 
+@@ -171,6 +173,26 @@
+   return multi_file_sync_next_type;
+ }
+ 
++#define GST_TYPE_MULTI_FILE_SINK_CACHE_CONTROL (gst_multi_file_sink_cache_control_get_type ())
++static GType
++gst_multi_file_sink_cache_control_get_type (void)
++{
++  static GType multi_file_sync_cache_control_type = 0;
++  static const GEnumValue cache_control_types[] = {
++    {GST_MULTI_FILE_SINK_CACHE_CONTROL_DEFAULT, "Use default kernel file caching algorithm", "default"},
++    {GST_MULTI_FILE_SINK_CACHE_CONTROL_O_DIRECT, "Pass in O_DIRECT hint for kernel file caching hint", "o_direct"},
++    {GST_MULTI_FILE_SINK_CACHE_CONTROL_FADVISE, "Use posix_fadvise() to pass in kernel file caching hint", "fadvise"},
++    {0, NULL, NULL}
++  };
++
++  if (!multi_file_sync_cache_control_type) {
++    multi_file_sync_cache_control_type =
++        g_enum_register_static ("GstMultiFileSinkCacheControl", cache_control_types);
++  }
++
++  return multi_file_sync_cache_control_type;
++}
++
+ GST_BOILERPLATE (GstMultiFileSink, gst_multi_file_sink, GstBaseSink,
+     GST_TYPE_BASE_SINK);
+ 
+@@ -232,6 +254,19 @@
+           GST_TYPE_MULTI_FILE_SINK_NEXT, DEFAULT_NEXT_FILE,
+           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+ 
++  /**
++   * GstMultiFileSink:cache-control
++   *
++   * How to give a hint to the kernel file data access will be done.
++   *
++   * Since: ridgerun-patch-to-0.10.25
++   */
++  g_object_class_install_property (gobject_class, PROP_CACHE_CONTROL,
++      g_param_spec_enum ("cache-control", "Kernel cache control",
++          "Hint to kernel to indicate how file access will be done",
++	  GST_TYPE_MULTI_FILE_SINK_CACHE_CONTROL, DEFAULT_CACHE_CONTROL,
++          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
++
+   gobject_class->finalize = gst_multi_file_sink_finalize;
+ 
+   gstbasesink_class->get_times = NULL;
+@@ -294,6 +329,9 @@
+     case PROP_NEXT_FILE:
+       sink->next_file = g_value_get_enum (value);
+       break;
++    case PROP_CACHE_CONTROL:
++      sink->cache_control = g_value_get_enum (value);
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+@@ -319,6 +357,9 @@
+     case PROP_NEXT_FILE:
+       g_value_set_enum (value, sink->next_file);
+       break;
++    case PROP_CACHE_CONTROL:
++      g_value_set_enum (value, sink->cache_control);
++      break;
+     default:
+       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+       break;
+@@ -396,6 +437,7 @@
+   gchar *filename;
+   gboolean ret;
+   GError *error = NULL;
++  gint fd;
+ 
+   size = GST_BUFFER_SIZE (buffer);
+   data = GST_BUFFER_DATA (buffer);
+@@ -487,7 +529,24 @@
+ 
+         filename = g_strdup_printf (multifilesink->filename,
+             multifilesink->index);
+-        multifilesink->file = g_fopen (filename, "wb");
++	switch (multifilesink->cache_control) {
++	  case GST_MULTI_FILE_SINK_CACHE_CONTROL_O_DIRECT:
++	    fd=g_open(filename, O_CREAT | O_WRONLY | O_DIRECT);
++	    if (fd >= 0 )
++	      multifilesink->file = fdopen(fd, "wb");
++	    break;
++	  case GST_MULTI_FILE_SINK_CACHE_CONTROL_FADVISE:
++	    fd=g_open(filename, O_CREAT | O_WRONLY );
++	    if (fd >= 0 ) {
++	      posix_fadvise(fd, 0, 0, POSIX_FADV_NOREUSE);
++	      multifilesink->file = fdopen(fd, "wb");
++	    }
++	    break;
++	  case   GST_MULTI_FILE_SINK_CACHE_CONTROL_DEFAULT:
++	  default:
++	    multifilesink->file = g_fopen (filename, "wb");
++	}
++
+         g_free (filename);
+ 
+         if (multifilesink->file == NULL)
+Index: gst-plugins-good-0.10.25/src/gst/multifile/gstmultifilesink.h
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/gst/multifile/gstmultifilesink.h	2013-02-14 09:47:53.021999396 -0700
++++ gst-plugins-good-0.10.25/src/gst/multifile/gstmultifilesink.h	2013-02-14 10:34:10.406794449 -0700
+@@ -58,6 +58,12 @@
+   GST_MULTI_FILE_SINK_NEXT_KEY_FRAME
+ } GstMultiFileSinkNext;
+ 
++typedef enum {
++  GST_MULTI_FILE_SINK_CACHE_CONTROL_DEFAULT,
++  GST_MULTI_FILE_SINK_CACHE_CONTROL_O_DIRECT,
++  GST_MULTI_FILE_SINK_CACHE_CONTROL_FADVISE
++} GstMultiFileSinkCacheControl;
++
+ struct _GstMultiFileSink
+ {
+   GstBaseSink parent;
+@@ -66,6 +72,7 @@
+   gint index;
+   gboolean post_messages;
+   GstMultiFileSinkNext next_file;
++  GstMultiFileSinkCacheControl cache_control;
+   FILE *file;
+ 
+   gint64 next_segment;

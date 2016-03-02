@@ -1,0 +1,12 @@
+config UBOOT_NAND_FLASH_MEMORY
+	bool
+	select NAND_FLASH_HW_ECC_4_BIT
+	default y
+
+#config UBOOT_USBD
+#	bool
+#	default y
+
+config UBOOT_NETWORKING
+	bool
+	default y

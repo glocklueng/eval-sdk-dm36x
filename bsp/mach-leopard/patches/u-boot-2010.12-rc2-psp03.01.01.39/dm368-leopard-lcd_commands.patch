@@ -1,0 +1,12 @@
+Index: u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm368leopard.h
+===================================================================
+--- u-boot-2010.12-rc2-psp03.01.01.39.orig/src/include/configs/davinci_dm368leopard.h	2011-05-24 16:46:12.133038046 -0600
++++ u-boot-2010.12-rc2-psp03.01.01.39/src/include/configs/davinci_dm368leopard.h	2011-05-24 16:46:13.301181501 -0600
+@@ -182,6 +182,7 @@
+ #define CONFIG_RBTREE
+ #endif
+ 
++#define CONFIG_CMD_LCD_CMDS
+ #define CONFIG_CRC32_VERIFY
+ #define CONFIG_MX_CYCLIC
+ 

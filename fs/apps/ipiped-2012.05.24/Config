@@ -1,0 +1,15 @@
+config FS_APPS_IPIPED
+	select FS_APPS_DBUS
+	select FS_APPS_DBUS_DAEMON
+	select FS_APPS_GLIB
+	select FS_APPS_READLINE
+	select FS_APPS_NCURSES
+	bool "ipiped"
+	default n
+	help
+	Ipiped is an application capable of receiving
+	through dbus messages commands to configure
+	and control IPIPE path and its modules.
+	
+	When used along with other libraries it can provide
+	autowhite balance/autoexposure algorithms

@@ -1,0 +1,210 @@
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile.app
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile.app	2011-02-22 09:29:37.364171153 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile.app	2011-02-22 09:31:39.411792776 -0600
+@@ -56,7 +56,7 @@
+ LPM_INSTALL_DIR		 = $(strip $(LPM_INSTALL_DIR_$(PLATFORM)))
+ LINUXLIBS_INSTALL_DIR	 = $(strip $(LINUXLIBS_INSTALL_DIR_$(PLATFORM)))
+ C6ACCEL_INSTALL_DIR	 = $(strip $(C6ACCEL_INSTALL_DIR_$(PLATFORM)))
+-USER_XDC_PATH    	 = $(strip $(USER_XDC_PATH_$(PLATFORM)))
++[M $*USER_XDC_PATH    	 = $(strip $(USER_XDC_PATH_$(PLATFORM)))
+ EXEC_DIR		 = $(strip $(EXEC_DIR_$(PLATFORM)))
+ 
+ PLATFORM_OS		 = $(strip $(PLATFORM_OS_$(PLATFORM)))
+@@ -66,10 +66,10 @@
+ PLATFORM_XDC		 = $(strip $(PLATFORM_XDC_$(PLATFORM)))
+ 
+ # Should the full command be echoed to the console during build?
+-VERBOSE=false
++V=false
+ 
+-ifeq ($(VERBOSE), true)
+-    override PRE	=
++ifeq ($(V), true)
++[M ;    override PRE	=
+ else
+     override PRE	= @
+ endif
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile	2011-02-22 09:33:16.312016602 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/apps/Makefile	2011-02-22 09:35:29.164241727 -0600
+@@ -34,7 +34,7 @@
+ CLEANSUBDIRS = $(addsuffix .clean, $(SUBDIRS))
+ INSTALLSUBDIRS = $(addsuffix .install, $(SUBDIRS))
+ 
+-ifeq ($(VERBOSE), true)
++ifeq ($(V), true)
+ 	MAKE := $(MAKE)
+ else
+ 	MAKE := $(MAKE) --no-print-directory
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/Makefile	2011-02-22 09:36:11.931794039 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/Makefile	2011-02-22 09:37:09.675793750 -0600
+@@ -61,9 +61,9 @@
+ PLATFORM_XDC		 = $(strip $(PLATFORM_XDC_$(PLATFORM)))
+ 
+ # Should the full command be echoed to the console during build?
+-VERBOSE=false
++V=false
+ 
+-ifeq ($(VERBOSE), true)
++ifeq ($(V), true)
+     override PRE	=
+ else
+     override PRE	= @
+Index: dvsdk-4_02_00_06/dvsdk/dvsdk-demos_4_02_00_01/dm365/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dvsdk-demos_4_02_00_01/dm365/Makefile	2011-02-22 09:40:30.908103760 -0600
++++ dvsdk-4_02_00_06/dvsdk/dvsdk-demos_4_02_00_01/dm365/Makefile	2011-02-22 09:40:58.871821402 -0600
+@@ -39,7 +39,7 @@
+ CLEANSUBDIRS = $(addsuffix .clean, $(SUBDIRS))
+ INSTALLSUBDIRS = $(addsuffix .install, $(SUBDIRS))
+ 
+-ifeq ($(VERBOSE), true)
++ifeq ($(V), true)
+ 	MAKE := $(MAKE)
+ else
+ 	MAKE := $(MAKE) --no-print-directory
+Index: dvsdk-4_02_00_06/dvsdk/dvsdk-demos_4_02_00_01/dm365/encodedecode/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dvsdk-demos_4_02_00_01/dm365/encodedecode/Makefile	2011-02-22 09:38:17.151794618 -0600
++++ dvsdk-4_02_00_06/dvsdk/dvsdk-demos_4_02_00_01/dm365/encodedecode/Makefile	2011-02-22 09:39:46.684292868 -0600
+@@ -39,7 +39,7 @@
+ include $(ROOTDIR)/Rules.make
+ 
+ # Comment this out if you want to see full compiler and linker output.
+-override VERBOSE = @
++override V = @
+ 
+ # Package path for the XDC tools
+ XDC_PATH = $(USER_XDC_PATH);../../packages;$(DMAI_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/packages;$(FC_INSTALL_DIR)/packages;$(LINK_INSTALL_DIR)/packages;$(XDAIS_INSTALL_DIR)/packages;$(CMEM_INSTALL_DIR)/packages;$(CODEC_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/examples
+@@ -72,8 +72,8 @@
+ 
+ LD_FLAGS += -L$(LINUXLIBS_INSTALL_DIR)/lib -lpthread -lasound
+ 
+-COMPILE.c = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
+-LINK.c = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
++COMPILE.c = $(V) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
++LINK.c = $(V) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
+ 
+ SOURCES = $(wildcard *.c) $(wildcard ../*.c)
+ HEADERS = $(wildcard *.h) $(wildcard ../*.h)
+@@ -111,8 +111,8 @@
+ 	@echo ======== Building $(TARGET) ========
+ 	@echo Configuring application using $<
+ 	@echo
+-	$(VERBOSE) XDCPATH="$(XDC_PATH)" $(CONFIGURO) -o $(XDC_CFG) -t $(XDC_TARGET) -p $(XDC_PLATFORM) -b $(CONFIG_BLD) $(XDC_CFGFILE)
++	$(V) XDCPATH="$(XDC_PATH)" $(CONFIGURO) -o $(XDC_CFG) -t $(XDC_TARGET) -p $(XDC_PLATFORM) -b $(CONFIG_BLD) $(XDC_CFGFILE)
+ 
+ clean:
+ 	@echo Removing generated files..
+-	$(VERBOSE) -$(RM) -rf $(XDC_CFG) $(OBJFILES) $(TARGET) *~ *.d .dep
++	$(V) -$(RM) -rf $(XDC_CFG) $(OBJFILES) $(TARGET) *~ *.d .dep
+Index: dvsdk-4_02_00_06/dvsdk/dvsdk-demos_4_02_00_01/dm365/decode/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dvsdk-demos_4_02_00_01/dm365/decode/Makefile	2011-02-22 09:41:49.500936199 -0600
++++ dvsdk-4_02_00_06/dvsdk/dvsdk-demos_4_02_00_01/dm365/decode/Makefile	2011-02-22 09:42:35.163854150 -0600
+@@ -39,7 +39,7 @@
+ include $(ROOTDIR)/Rules.make
+ 
+ # Comment this out if you want to see full compiler and linker output.
+-override VERBOSE = @
++override V = @
+ 
+ # Package path for the XDC tools
+ XDC_PATH = $(USER_XDC_PATH);../../packages;$(DMAI_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/packages;$(FC_INSTALL_DIR)/packages;$(LINK_INSTALL_DIR)/packages;$(XDAIS_INSTALL_DIR)/packages;$(CMEM_INSTALL_DIR)/packages;$(CODEC_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/examples
+@@ -72,8 +72,8 @@
+ 
+ LD_FLAGS += -L$(LINUXLIBS_INSTALL_DIR)/lib -lpthread -lasound
+ 
+-COMPILE.c = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
+-LINK.c = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
++COMPILE.c = $(V) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
++LINK.c = $(V) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
+ 
+ SOURCES = $(wildcard *.c) $(wildcard ../*.c)
+ HEADERS = $(wildcard *.h) $(wildcard ../*.h)
+@@ -111,8 +111,8 @@
+ 	@echo ======== Building $(TARGET) ========
+ 	@echo Configuring application using $<
+ 	@echo
+-	$(VERBOSE) XDCPATH="$(XDC_PATH)" $(CONFIGURO) -o $(XDC_CFG) -t $(XDC_TARGET) -p $(XDC_PLATFORM) -b $(CONFIG_BLD) $(XDC_CFGFILE)
++	$(V) XDCPATH="$(XDC_PATH)" $(CONFIGURO) -o $(XDC_CFG) -t $(XDC_TARGET) -p $(XDC_PLATFORM) -b $(CONFIG_BLD) $(XDC_CFGFILE)
+ 
+ clean:
+ 	@echo Removing generated files..
+-	$(VERBOSE) -$(RM) -rf $(XDC_CFG) $(OBJFILES) $(TARGET) *~ *.d .dep
++	$(V) -$(RM) -rf $(XDC_CFG) $(OBJFILES) $(TARGET) *~ *.d .dep
+Index: dvsdk-4_02_00_06/dvsdk/dvsdk-demos_4_02_00_01/dm365/encode/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dvsdk-demos_4_02_00_01/dm365/encode/Makefile	2011-02-22 09:43:26.055921569 -0600
++++ dvsdk-4_02_00_06/dvsdk/dvsdk-demos_4_02_00_01/dm365/encode/Makefile	2011-02-22 09:44:09.868051926 -0600
+@@ -39,7 +39,7 @@
+ include $(ROOTDIR)/Rules.make
+ 
+ # Comment this out if you want to see full compiler and linker output.
+-override VERBOSE = @
++override V = @
+ 
+ # Package path for the XDC tools
+ XDC_PATH = $(USER_XDC_PATH);../../packages;$(DMAI_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/packages;$(FC_INSTALL_DIR)/packages;$(LINK_INSTALL_DIR)/packages;$(XDAIS_INSTALL_DIR)/packages;$(CMEM_INSTALL_DIR)/packages;$(CODEC_INSTALL_DIR)/packages;$(CE_INSTALL_DIR)/examples
+@@ -72,8 +72,8 @@
+ 
+ LD_FLAGS += -L$(LINUXLIBS_INSTALL_DIR)/lib -lpthread -lasound
+ 
+-COMPILE.c = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
+-LINK.c = $(VERBOSE) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
++COMPILE.c = $(V) $(CSTOOL_PREFIX)gcc $(CPP_FLAGS) $(C_FLAGS) $(CPP_FLAGS) -c
++LINK.c = $(V) $(CSTOOL_PREFIX)gcc $(LD_FLAGS)
+ 
+ SOURCES = $(wildcard *.c) $(wildcard ../*.c)
+ HEADERS = $(wildcard *.h) $(wildcard ../*.h)
+@@ -111,8 +111,8 @@
+ 	@echo ======== Building $(TARGET) ========
+ 	@echo Configuring application using $<
+ 	@echo
+-	$(VERBOSE) XDCPATH="$(XDC_PATH)" $(CONFIGURO) -o $(XDC_CFG) -t $(XDC_TARGET) -p $(XDC_PLATFORM) -b $(CONFIG_BLD) $(XDC_CFGFILE)
++	$(V) XDCPATH="$(XDC_PATH)" $(CONFIGURO) -o $(XDC_CFG) -t $(XDC_TARGET) -p $(XDC_PLATFORM) -b $(CONFIG_BLD) $(XDC_CFGFILE)
+ 
+ clean:
+ 	@echo Removing generated files..
+-	$(VERBOSE) -$(RM) -rf $(XDC_CFG) $(OBJFILES) $(TARGET) *~ *.d .dep
++	$(V) -$(RM) -rf $(XDC_CFG) $(OBJFILES) $(TARGET) *~ *.d .dep
+Index: dvsdk-4_02_00_06/dvsdk/dvtb_4_20_18/packages/ti/sdo/dvtb/dm3730/wince/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dvtb_4_20_18/packages/ti/sdo/dvtb/dm3730/wince/Makefile	2011-02-22 09:45:26.524545351 -0600
++++ dvsdk-4_02_00_06/dvsdk/dvtb_4_20_18/packages/ti/sdo/dvtb/dm3730/wince/Makefile	2011-02-22 09:45:49.263852526 -0600
+@@ -44,10 +44,10 @@
+ TARGET=dvtb
+ 
+ # Should the full command be echoed to the console during build?
+-VERBOSE=false
+-#VERBOSE=true
++V=false
++#V=true
+ 
+-ifeq ($(VERBOSE), true)
++ifeq ($(V), true)
+     override PRE	=
+ else
+     override PRE	= @
+Index: dvsdk-4_02_00_06/dvsdk/dvtb_4_20_18/packages/ti/sdo/dvtb/omap3530/wince/Makefile
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dvtb_4_20_18/packages/ti/sdo/dvtb/omap3530/wince/Makefile	2011-02-22 09:44:35.447924347 -0600
++++ dvsdk-4_02_00_06/dvsdk/dvtb_4_20_18/packages/ti/sdo/dvtb/omap3530/wince/Makefile	2011-02-22 09:45:01.164042218 -0600
+@@ -44,10 +44,10 @@
+ TARGET=dvtb
+ 
+ # Should the full command be echoed to the console during build?
+-VERBOSE=false
+-#VERBOSE=true
++V=false
++#V=true
+ 
+-ifeq ($(VERBOSE), true)
++ifeq ($(V), true)
+     override PRE	=
+ else
+     override PRE	= @

@@ -1,0 +1,126 @@
+Index: gst-plugins-good-0.10.25/src/sys/v4l2/gstv4l2object.c
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/sys/v4l2/gstv4l2object.c	2011-04-04 10:17:22.620599405 -0600
++++ gst-plugins-good-0.10.25/src/sys/v4l2/gstv4l2object.c	2011-04-04 10:19:41.077050165 -0600
+@@ -375,6 +375,7 @@
+ 
+   v4l2object->davinci_previewer_dev = NULL;
+   v4l2object->davinci_previewer_fd  = -1;
++  v4l2object->chain_ipipe = TRUE;
+   #endif
+ 
+   v4l2object->pushed_frame_count_1000x = 0UL;
+Index: gst-plugins-good-0.10.25/src/sys/v4l2/gstv4l2object.h
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/sys/v4l2/gstv4l2object.h	2011-04-04 10:17:38.420735571 -0600
++++ gst-plugins-good-0.10.25/src/sys/v4l2/gstv4l2object.h	2011-04-04 10:22:00.884602155 -0600
+@@ -96,6 +96,9 @@
+   /* the previewer device and file descriptor */
+   char *davinci_previewer_dev;
+   gint  davinci_previewer_fd;
++
++  /* choose if we want the ipipe to be chained or not */
++  gboolean chain_ipipe;
+   #endif
+ 
+   /* how many capture frames to drop for each frame pushed */
+Index: gst-plugins-good-0.10.25/src/sys/v4l2/gstv4l2src.c
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/sys/v4l2/gstv4l2src.c	2011-04-04 10:17:51.032988301 -0600
++++ gst-plugins-good-0.10.25/src/sys/v4l2/gstv4l2src.c	2011-04-04 10:28:49.028668902 -0600
+@@ -63,6 +63,7 @@
+ 
+ #define PROP_DEF_QUEUE_SIZE         2
+ #define PROP_DEF_ALWAYS_COPY        TRUE
++#define PROP_DEF_CHAIN_IPIPE        TRUE
+ 
+ #define DEFAULT_PROP_DEVICE   "/dev/video0"
+ 
+@@ -75,6 +76,9 @@
+ #if defined(MVL_LSP) && defined(Platform_dm365)
+   PROP_FORCE_720P_30,
+ #endif
++#if defined(USE_DM365_IPIPE)
++  PROP_CHAIN_IPIPE,
++#endif
+   PROP_INPUT_SRC
+ };
+ 
+@@ -270,7 +274,13 @@
+           PROP_DEF_ALWAYS_COPY, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+   g_object_class_install_property (gobject_class, PROP_INPUT_SRC,
+       g_param_spec_string ("input-src", "Select the input source",
+-          "Select the input source)", NULL, G_PARAM_READWRITE));
++          "Select the input source", NULL, G_PARAM_READWRITE));
++#if defined(USE_DM365_IPIPE)
++  g_object_class_install_property (gobject_class, PROP_CHAIN_IPIPE,
++      g_param_spec_boolean ("chain-ipipe", "Chain the IPIPE",
++          "Selects if the ipipe will be chained or not",
++		  PROP_DEF_CHAIN_IPIPE, G_PARAM_READWRITE));
++#endif
+ #if defined(MVL_LSP) && defined(Platform_dm365)
+   g_object_class_install_property (gobject_class, PROP_FORCE_720P_30,
+       g_param_spec_boolean ("force-720p-30", "Configure 720P @ 30fps",
+@@ -309,7 +319,9 @@
+ #if defined(MVL_LSP) && defined(Platform_dm365)
+   v4l2src->v4l2object->force_720p_30 = FALSE;
+ #endif
+-
++#if defined(USE_DM365_IPIPE)
++  v4l2src->v4l2object->chain_ipipe = PROP_DEF_CHAIN_IPIPE;
++#endif
+   /* Set the default input ID on a per-target basis */
+   #if defined (Platform_dm365)
+     #if defined(MVL_LSP)
+@@ -377,6 +389,11 @@
+         v4l2src->v4l2object->force_720p_30 = g_value_get_boolean (value);
+         break;
+ #endif
++#if defined(USE_DM365_IPIPE)
++      case PROP_CHAIN_IPIPE:
++        v4l2src->v4l2object->chain_ipipe = g_value_get_boolean (value);
++        break;
++#endif
+       default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+         break;
+@@ -408,6 +425,11 @@
+         g_value_set_boolean (value, v4l2src->v4l2object->force_720p_30);
+         break;
+ #endif
++#if defined(USE_DM365_IPIPE)
++      case PROP_CHAIN_IPIPE:
++        g_value_set_boolean (value, v4l2src->v4l2object->chain_ipipe);
++        break;
++#endif
+       default:
+         G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+         break;
+Index: gst-plugins-good-0.10.25/src/sys/v4l2/v4l2_calls.c
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/sys/v4l2/v4l2_calls.c	2011-04-04 10:18:08.356729273 -0600
++++ gst-plugins-good-0.10.25/src/sys/v4l2/v4l2_calls.c	2011-04-04 10:31:55.156786762 -0600
+@@ -489,10 +489,12 @@
+   GstPollFD pollfd = GST_POLL_FD_INIT;
+ 
+   #if defined (USE_DM365_IPIPE)
++  if(v4l2object->chain_ipipe) {
+     if (gst_v4l2_dm365_ipipe_open(v4l2object) < 0)
+       GST_ERROR("failed to open IPIPE\n");
+     if (gst_v4l2_dm365_ipipe_init(v4l2object) < 0)
+       GST_ERROR("failed to initialize IPIPE\n");
++  }
+   #endif
+ 
+   GST_DEBUG_OBJECT (v4l2object->element, "Trying to open device %s",
+@@ -638,8 +640,10 @@
+   v4l2object->video_fd = -1;
+ 
+   #if defined (USE_DM365_IPIPE)
++  if(v4l2object->chain_ipipe) {
+     if (gst_v4l2_dm365_ipipe_close(v4l2object) < 0)
+       GST_ERROR("failed to close IPIPE\n");
++  }
+   #endif
+ 
+   /* empty lists */

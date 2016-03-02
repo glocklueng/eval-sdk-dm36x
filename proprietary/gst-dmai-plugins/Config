@@ -1,0 +1,55 @@
+config PROPRIETARY_TI_GST_CODECS
+	bool "Gstreamer DMAI Plugins"
+	select PROPRIETARY_TI_DMAI 
+	select FS_APPS_GSTREAMER_PLUGINS_BASE
+	select FS_APPS_GSTREAMER_PLUGINS_GOOD
+	depends on PROPRIETARY_TI_CODECENGINE
+	default n
+	help
+	    Build a set of gstreamer plugins for Davinci chip family and OMAP35x
+
+choice
+	prompt "SVN Plugins Source"
+	depends on PROPRIETARY_TI_GST_CODECS
+	default PROPRIETARY_TI_GST_CODECS_BRANCH
+
+config PROPRIETARY_TI_GST_CODECS_TRUNK
+	bool "Trunk"
+	help
+	  Say Y if you want to checkout the plugins from the TI trunk
+
+config PROPRIETARY_TI_GST_CODECS_BRANCH
+	bool "Branch"
+	help
+	  Say Y if you want to checkout the plugins from Dompe's branch
+endchoice
+
+config PROPRIETARY_TI_GST_CODECS_DM355S
+        bool "Build DM355s Codec configuration instead of standard DM355 Codecs"
+        depends on ARCH_DAVINCI_DM355
+        depends on PROPRIETARY_TI_GST_CODECS
+        default n
+        help
+        Enable if you want to enable the plugins to build the codecs using the
+        DM355s Ittiam Audio Codecs. You need to have the ittiam XDC packages
+        on proprietary/codecs/ittiam
+
+config PROPRIETARY_TI_GST_CODECS_DM365S
+        bool "Build DM365 Codec with AAC support"
+        depends on ARCH_DAVINCI_DM365
+        depends on PROPRIETARY_TI_GST_CODECS
+        depends on PROPRIETARY_TI_DM365_EXTRA_CODECS
+        default n
+        help
+        Enable if you want to enable the plugins to build the codecs using the
+        DM365 Ittiam Audio Codecs. You need to have the ittiam XDC packages
+        on proprietary/dm365_codecs
+
+config PROPRIETARY_TI_GST_CMEM_DEBUG
+        bool "Enable CMEM debug"
+        depends on PROPRIETARY_TI_GST_CODECS
+        depends on PROPRIETARY_TI_CMEM_DEBUG
+        default n
+        help
+        enable the CMEM debug in the dmai plugins
+

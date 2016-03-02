@@ -1,0 +1,35 @@
+Index: ti-flash-utils/src/Common/ubl/src/sdmmcboot.c
+===================================================================
+--- ti-flash-utils.orig/src/Common/ubl/src/sdmmcboot.c	2013-05-14 14:24:24.274621643 -0600
++++ ti-flash-utils/src/Common/ubl/src/sdmmcboot.c	2013-05-14 14:27:08.262158506 -0600
+@@ -6,7 +6,7 @@
+                 application (usually U-boot) and loading it to RAM.
+ ----------------------------------------------------------------------------- */
+ 
+-#ifdef UBL_SD_MMC
++#ifdef UBL_SDMMC
+ 
+ // General type include
+ #include "tistdtypes.h"
+Index: ti-flash-utils/src/Common/ubl/src/ubl.c
+===================================================================
+--- ti-flash-utils.orig/src/Common/ubl/src/ubl.c	2013-05-14 14:24:24.306619994 -0600
++++ ti-flash-utils/src/Common/ubl/src/ubl.c	2013-05-14 14:27:08.290157060 -0600
+@@ -34,7 +34,7 @@
+ #include "nandboot.h"
+ #endif
+ 
+-#ifdef UBL_SD_MMC
++#ifdef UBL_SDMMC
+ // NAND driver include
+ #include "sdmmc.h"
+ #include "sdmmcboot.h"
+@@ -174,7 +174,7 @@
+       LOCAL_bootAbort();
+     }
+   }
+-#elif defined(UBL_SD_MMC)
++#elif defined(UBL_SDMMC)
+   {
+     //Report Bootmode to host
+     DEBUG_printString("SD/MMC \r\n");

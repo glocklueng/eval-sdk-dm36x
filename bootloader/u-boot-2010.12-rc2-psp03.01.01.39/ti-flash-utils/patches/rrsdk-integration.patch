@@ -1,0 +1,13 @@
+Index: ti-flash-utils/src/DM36x/GNU/ubl/build/makefile
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/GNU/ubl/build/makefile	2013-08-13 08:19:35.322218999 -0600
++++ ti-flash-utils/src/DM36x/GNU/ubl/build/makefile	2013-08-13 08:20:39.662219246 -0600
+@@ -12,7 +12,7 @@
+ 
+ PROGRAM:=ubl
+ 
+-CROSSCOMPILE=arm-none-linux-gnueabi-
++CROSSCOMPILE?=$(CROSSCOMPILE_PREFIX)-
+ CC=$(CROSSCOMPILE)gcc
+ OBJCOPY=$(CROSSCOMPILE)objcopy
+ OBJDUMP=$(CROSSCOMPILE)objdump

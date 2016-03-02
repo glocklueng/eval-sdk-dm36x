@@ -1,0 +1,31 @@
+
+ifeq ($(DEVDIR),)
+$(error ====== DEVDIR variable is empty, invoke this Makefile from the BSP root, or provide the path to it =====)
+endif
+include $(DEVDIR)/bsp/mach/Make.conf
+
+device?=none
+export SD_BOOT_ROOT_DIR= $(DEVDIR)/bsp/mach/dm3xx_sd_boot-6_leopard
+
+sd_boot_recover:
+	$(V) test "$(device)" != "none" || { \
+			$(ECHO);$(ECHO)"\033[32mError:\033[0m" You need to define your sd device.To prepare the SD card:;\
+			$(ECHO);$(ECHO) 1. Insert a SD card  \(SDHC is not supported\) to a Linux PC;\
+			$(ECHO) 2. Find out the device name of this SD card by looking at /dev/sd*; \
+			$(ECHO) 3. Next time type "\033[32m make sd_boot_recover device=/dev/sdx\033[0m";\
+			$(ECHO); exit -1;}
+	$(V) export PATH=$PATH:./bin.x86
+	$(ECHO) "\033[30mBuilding \033[0m"
+	$(V) make -C $(SD_BOOT_ROOT_DIR)/
+	$(V)$(ECHO) "\033[31mFlashing SD Card\033[0m"
+	$(V) cd $(SD_BOOT_ROOT_DIR); sudo $(SD_BOOT_ROOT_DIR)/dm3xx_sd_boot format $(device); cd $(DEVDIR)
+	$(V) $(ECHO) And Run "\033[31mmake install_sd_boot_recover\033[0m" next time
+
+install_sd_boot_recover:
+	$(V) make -C  $(SD_BOOT_ROOT_DIR)/ install
+	$(V)$(ECHO); $(ECHO) "\033[31m To burn NAND flash:\033[0m"
+	$(V)$(ECHO) 1. Insert the SD card to Leopard 365
+	$(V)$(ECHO) 2. Set position 2 of DIPSW1 \(the 3 pos switch\) to ON, 1 and 3 to OFF. This is SD card boot mode
+	$(V)$(ECHO) 3. Power up the board, it will automatically erase the NAND flash, and burn UBL, u-boot, kernel and filesys
+	$(V)$(ECHO) 4. Set all pos of DIPSW1 to OFF for NAND boot mode
+	$(V)$(ECHO) 5. Connect serial cable to PC, power cycle the board, it should boot up1. Insert the SD card to Leopard 368

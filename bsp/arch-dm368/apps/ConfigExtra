@@ -1,0 +1,6 @@
+# Automatic generated file by Makefile, don't edit
+
+
+source fs/arch/base/Config 
+
+

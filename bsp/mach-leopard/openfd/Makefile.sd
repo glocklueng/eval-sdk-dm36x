@@ -1,0 +1,34 @@
+#$L$
+# Copyright (C) 2013 Ridgerun (http://www.ridgerun.com). 
+#$L$
+
+BOOTARGS=$(shell cat $(IMAGEDIR)/cmdline)
+
+WORKDIR=$(IMAGEDIR)/openfd
+
+SD_ARGS+= --kernel-file $(IMAGEDIR)/kernel.uImage \
+  --uflash-bin $(BOOTLOADERDIR)/src/tools/uflash/uflash \
+  --ubl-file $(IMAGEDIR)/ubl_DM36x_sdmmc.bin \
+  --uboot-file $(IMAGEDIR)/bootloader \
+  --uboot-entry-addr $(CONFIG_UBOOT_RAM_ADDRS) \
+  --uboot-load-addr $(CONFIG_UBOOT_RAM_ADDRS) \
+  --work-dir $(WORKDIR)
+ifneq ($(CONFIG_FS_TARGET_NFSROOT),y)
+SD_ARGS += --rootfs $(FSROOT)
+endif
+
+ifeq ($(CONFIG_INSTALLER_SD_DEVICE_LOOPBACK),y)
+SD_MODE=sd-img
+SD_ARGS += --image $(IMAGEDIR)/sdcard.img \
+  --image-size-mb $(CONFIG_INSTALLER_SD_DEVICE_LOOPBACK_SIZE)
+else
+SD_MODE=sd
+SD_ARGS += --device $(CONFIG_INSTALLER_SD_DEVICE)
+endif
+
+callinstallersd:
+	$(V) mkdir -p $(WORKDIR)
+	$(V) $(INSTALLER_EXE) $(INSTALLER_ARGS) $(SD_MODE) $(SD_ARGS) --uboot-bootargs "$(BOOTARGS)"
+
+installfsonly: $(IMAGEDIR)/fsimage callinstallersd
+install: installmemorymap callinstallersd

@@ -1,0 +1,24 @@
+2008-06-24  Miguel Aguilar <miguel.aguilar@ridgerun.com>
+
+	* kernel/arch/arm/mach-dm355/board-tievm: Add SPI and USB devices
+	and clean code.
+	* kernel/arch/arm/mach-dm355/devices: Remove SPI and USB devices
+	and clean code.
+
+2008-05-14  Miguel Aguilar <miguel.aguilar@ridgerun.com>
+
+	* bsp/mach-tievm/apps/base/Makefile: Add JFFS2 support.
+
+2008-05-06  Diego Dompe <diego.dompe@ridgerun.com>
+	* bsp/mach/apps/targets,fstargets: rename directory for machine
+	specific file systems
+
+2008-04-01  Miguel Aguilar <miguel.aguilar@ridgerun.com>
+
+	* bsp/mach-tievm/ChangeLog: Start ChangeLog.
+	* bsp/mach-tievm/bspconfig.default: Changes to default values:
+	-Disable Flash driver.
+	-Enable USB host-side support.
+	-Enable SCSI device support.
+	-Enable USB mass storage.
+	-Enable Video4Linux.

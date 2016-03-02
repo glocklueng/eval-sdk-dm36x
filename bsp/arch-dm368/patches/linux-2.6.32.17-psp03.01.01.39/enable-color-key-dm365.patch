@@ -1,0 +1,35 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_osd.c
+===================================================================
+--- kernel/linux-2.6.32.17-psp03.orig/drivers/media/video/davinci/davinci_osd.c	2010-11-24 16:56:12.395610119 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/davinci_osd.c	2010-11-24 16:59:57.219650247 -0600
+@@ -1099,7 +1099,7 @@
+ 	case PIXFMT_2BPP:
+ 	case PIXFMT_4BPP:
+ 	case PIXFMT_8BPP:
+-		if (cpu_is_davinci_dm355()) {
++		if (cpu_is_davinci_dm355() || cpu_is_davinci_dm365()) {
+ 			switch (osdwin) {
+ 			case OSDWIN_OSD0:
+ 				osd_merge(OSD_TRANSPBMPIDX_BMP0,
+@@ -1120,18 +1120,18 @@
+ 		if (cpu_is_davinci_dm644x()) {
+ 			osd_write(colorkey & OSD_TRANSPVAL_RGBTRANS,
+ 				  OSD_TRANSPVAL);
+-		} else if (cpu_is_davinci_dm355()) {
++		} else if (cpu_is_davinci_dm355() || cpu_is_davinci_dm365()) {
+ 			osd_write(colorkey & OSD_TRANSPVALL_RGBL,
+ 				  OSD_TRANSPVALL);
+ 		}
+ 		break;
+ 	case PIXFMT_YCbCrI:
+ 	case PIXFMT_YCrCbI:
+-		if (cpu_is_davinci_dm355())
++		if (cpu_is_davinci_dm355() || cpu_is_davinci_dm365())
+ 			osd_merge(OSD_TRANSPVALU_Y, colorkey, OSD_TRANSPVALU);
+ 		break;
+ 	case PIXFMT_RGB888:
+-		if (cpu_is_davinci_dm355()) {
++		if (cpu_is_davinci_dm355() || cpu_is_davinci_dm365()) {
+ 			osd_write(colorkey & OSD_TRANSPVALL_RGBL,
+ 				  OSD_TRANSPVALL);
+ 			osd_merge(OSD_TRANSPVALU_RGBU, colorkey >> 16,

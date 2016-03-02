@@ -1,0 +1,2 @@
+HOST_REQUIRED="valac automake"
+TARGET_REQUIRED="readline glib librraew ncurses"

@@ -1,0 +1,61 @@
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/Resize.h
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/Resize.h	2011-03-24 16:10:23.000000000 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/Resize.h	2012-12-20 08:04:02.360557073 -0600
+@@ -196,7 +196,7 @@
+  * @remarks     #Resize_create must be called before this function.
+  */
+ extern Int Resize_config(Resize_Handle hResize,
+-                         Buffer_Handle hSrcBuf, Buffer_Handle hDstBuf);
++                         Buffer_Handle hSrcBuf, Buffer_Handle hDstBuf, Int rszChain);
+ 
+ /**
+  * @brief       Execute a Resize job.
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/Resize.c
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/Resize.c	2012-12-20 07:51:35.824543060 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/Resize.c	2012-12-20 07:58:41.052551040 -0600
+@@ -144,7 +144,7 @@
+  * Resize_config
+  ******************************************************************************/
+ Int Resize_config(Resize_Handle hResize,
+-                  Buffer_Handle hSrcBuf, Buffer_Handle hDstBuf)
++                  Buffer_Handle hSrcBuf, Buffer_Handle hDstBuf, Int rszChain)
+ {
+ #ifdef CONFIG_DM365_IPIPE
+     BufferGfx_Dimensions srcDim, dstDim;
+@@ -228,7 +228,7 @@
+     /* Set the driver default parameters and retrieve what was set */
+     Dmai_clear(rsz_ss_config);
+     rsz_chan_config.oper_mode = IMP_MODE_SINGLE_SHOT;
+-    rsz_chan_config.chain = 0;
++    rsz_chan_config.chain = rszChain;
+     rsz_chan_config.len = 0;
+     rsz_chan_config.config = NULL; /* to set defaults in driver */
+     if (ioctl(hResize->fd, RSZ_S_CONFIG, &rsz_chan_config) < 0) {
+@@ -239,7 +239,7 @@
+     /* default configuration setting in Resizer successfull */
+     Dmai_clear(rsz_ss_config);
+     rsz_chan_config.oper_mode = IMP_MODE_SINGLE_SHOT;
+-    rsz_chan_config.chain = 0;
++    rsz_chan_config.chain = rszChain;
+     rsz_chan_config.len = sizeof(struct rsz_single_shot_config);
+     rsz_chan_config.config = &rsz_ss_config;
+ 
+@@ -262,14 +262,14 @@
+     rsz_ss_config.output2.enable = 0;
+ 
+     rsz_chan_config.oper_mode = IMP_MODE_SINGLE_SHOT;
+-    rsz_chan_config.chain = 0;
++    rsz_chan_config.chain = rszChain;
+     rsz_chan_config.len = sizeof(struct rsz_single_shot_config);
+     if (ioctl(hResize->fd, RSZ_S_CONFIG, &rsz_chan_config) < 0) {
+         Dmai_err0("Error in setting default configuration for single shot mode\n");
+         goto cleanup;
+     }
+     rsz_chan_config.oper_mode = IMP_MODE_SINGLE_SHOT;
+-    rsz_chan_config.chain = 0;
++    rsz_chan_config.chain = rszChain;
+     rsz_chan_config.len = sizeof(struct rsz_single_shot_config);
+ 
+     /* read again and verify */

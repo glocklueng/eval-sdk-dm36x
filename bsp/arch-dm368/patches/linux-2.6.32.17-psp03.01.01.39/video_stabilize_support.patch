@@ -1,0 +1,583 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpfe_capture.c
+@@ -760,7 +760,17 @@
+ static void vpfe_process_buffer_complete(struct vpfe_device *vpfe_dev)
+ {
+ 	struct timeval timevalue;
+-
++	/*If bsc is enable, bsc sum should be attached to
++	 *the current buffer in order to be ready*/
++	if (imp_hw_if->get_bsc_state() == 1){
++		if (vpfe_dev->bsc_ready) {
++			vpfe_dev->bsc_ready = 0;
++			vpfe_dev->buffer_complete = 0;
++		} else {
++			vpfe_dev->buffer_complete = 1;
++			return;
++		}
++	}
+ 	do_gettimeofday(&timevalue);
+ 	vpfe_dev->cur_frm->ts = timevalue;
+ 	vpfe_dev->cur_frm->state = VIDEOBUF_DONE;
+@@ -769,6 +779,30 @@
+ 	vpfe_dev->cur_frm = vpfe_dev->next_frm;
+ }
+ 
++static irqreturn_t vpfe_bsc_isr(int irq, void *dev_id)
++{
++	struct vpfe_device *vpfe_dev = dev_id;
++	unsigned long* addr = 0;
++	unsigned long* tb_ptr;
++
++	/*Copy bsc results to the end of the current frame*/
++    if (vpfe_dev->cur_frm) {
++		addr = videobuf_queue_to_vmalloc (&vpfe_dev->buffer_queue,
++			vpfe_dev->cur_frm);
++		tb_ptr = imp_hw_if->bsc_tb_ptr;
++		addr = addr + vpfe_dev->fmt.fmt.pix.sizeimage/4;
++		memcpy(addr, tb_ptr, 0x4000);
++	}
++	vpfe_dev->bsc_ready = 1;
++
++	/*Function to complete buffer process should be called again
++	 *if it was called before than this interrupt */
++	if (vpfe_dev->buffer_complete){
++		vpfe_process_buffer_complete(vpfe_dev);
++	}
++	return IRQ_HANDLED;
++}
++
+ /* ISR for VINT0*/
+ static irqreturn_t vpfe_isr(int irq, void *dev_id)
+ {
+@@ -939,6 +973,9 @@
+ 		free_irq(vpfe_dev->imp_dma_irq, vpfe_dev);
+ 		if (vpfe_dev->imp_update_irq)
+ 			free_irq(vpfe_dev->imp_update_irq,vpfe_dev);
++		/*Detach bsc interrupt*/
++		if (vpfe_dev->imp_bsc_irq)
++			free_irq(vpfe_dev->imp_bsc_irq, vpfe_dev);
+ 	}
+ }
+ 
+@@ -949,7 +986,7 @@
+ 	enum v4l2_field field;
+ 	
+ 	vpfe_dev->imp_update_irq = 0;
+-
++	vpfe_dev->imp_bsc_irq = 0;
+ 	ret = request_irq(vpfe_dev->ccdc_irq0, vpfe_isr, IRQF_DISABLED,
+ 			  "vpfe_capture0", vpfe_dev);
+ 	if (ret < 0) {
+@@ -998,6 +1035,15 @@
+ 				  IRQF_DISABLED,
+ 				  "Imp_Sdram_Irq",
+ 				  vpfe_dev);
++		/*Attach bsc irq if bsc is enable*/
++		if (imp_hw_if->get_bsc_state() == 1){
++			vpfe_dev->imp_bsc_irq = irq_info.ipipe_bsc;
++			ret = request_irq(irq_info.ipipe_bsc,
++					  vpfe_bsc_isr,
++					  IRQF_DISABLED,
++					  "vpfe_bsc_isr",
++					  vpfe_dev);
++		}
+ 		if (ret < 0) {
+ 			v4l2_err(&vpfe_dev->v4l2_dev,
+ 				 "Error: requesting IMP"
+@@ -1057,7 +1103,6 @@
+ 		}
+ 	}
+ 
+-
+ 	/* Decrement device usrs counter */
+ 	vpfe_dev->usrs--;
+ 	/* Close the priority */
+@@ -1875,6 +1920,8 @@
+ 	 * user has called S_FMT and sizeimage has been calculated.
+ 	 */
+ 	*size = vpfe_dev->fmt.fmt.pix.sizeimage;
++	if (imp_hw_if->get_bsc_state() == 1)
++		*size += 0x4000;
+ 	if (vpfe_dev->second_output)
+ 		*size += vpfe_dev->second_out_img_sz;
+ 
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpss.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpss.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/davinci/vpss.c
+@@ -624,13 +624,13 @@
+ 		 */
+ 		isp5_write((isp5_read(0x4) | 0x0000007f), 0x4);
+ 		isp5_write((isp5_read(0x8) | 0x00000002), 0x8);
+-		/* INT0, INT1, AF */
+-		isp5_write((isp5_read(0x10) | 0x0b1f0100), 0x10);
+-		/* AEW, RSZ_INT_DMA */
++		/* INTSEL1 => AF_INT | IPIPE_INT_BSC | ISF_INT1 | ISF_INT0 */
++		isp5_write((isp5_read(0x10) | 0x0b070100), 0x10);
++		/* INTSEL2 => FREE | AEW_INT | RESERVED | RSZ_INT_REG */
+ 		isp5_write((isp5_read(0x14) | 0x1f0a0f0d), 0x14);
+-		/* VENC */
++		/* INTSEL3 => VENC_INT */
+ 		isp5_write((isp5_read(0x18) | 0x00000015), 0x18);
+-		/* No event selected */
++		/* EVTSEL  => No event selected */
+ 		isp5_write((isp5_read(0x1c) | 0x00000000), 0x1c);
+ 	}
+ 
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c
+@@ -165,6 +165,11 @@
+ static int set_cgs_params(struct device *dev, void *param, int len);
+ static int get_cgs_params(struct device *dev, void *param, int len);
+ 
++/* Boundary Signal Calculator, BSC */
++static struct prev_bsc bsc;
++static int set_bsc_params(struct device *dev, void *param, int len);
++static int get_bsc_params(struct device *dev, void *param, int len);
++
+ /* Tables for various tuning modules */
+ struct ipipe_lutdpc_entry ipipe_lutdpc_table[MAX_SIZE_DPC];
+ struct ipipe_3d_lut_entry ipipe_3d_lut_table[MAX_SIZE_3D_LUT];
+@@ -336,12 +341,22 @@
+ 		.path = IMP_RAW2YUV | IMP_YUV2YUV,
+ 		.set = set_cgs_params,
+ 		.get = get_cgs_params
++	},
++	{
++		.version = "5.1",
++		.module_id = PREV_BSC,
++		.module_name = "Boundary Signal Calculator",
++		.control = 1,
++		.path = IMP_RAW2YUV,
++		.set = set_bsc_params,
++		.get = get_bsc_params
+ 	}
+ };
+ 
+ /* function prototypes */
+ static struct prev_module_if *prev_enum_preview_cap(struct device *dev,
+ 						    int index);
++static unsigned int bsc_get_state(void);
+ static unsigned int prev_get_oper_mode(void);
+ static unsigned int ipipe_get_oper_state(void);
+ static void ipipe_set_oper_state(unsigned int state);
+@@ -440,6 +455,7 @@
+ 	.name = "DM365 IPIPE",
+ 	.owner = THIS_MODULE,
+ 	.prev_enum_modules = prev_enum_preview_cap,
++	.get_bsc_state = bsc_get_state,
+ 	.get_preview_oper_mode = prev_get_oper_mode,
+ 	.get_resize_oper_mode = prev_get_oper_mode,
+ 	.get_hw_state = ipipe_get_oper_state,
+@@ -625,6 +641,7 @@
+ {
+ 	irq->sdram = IRQ_PRVUINT;
+ 	irq->update = 4;
++	irq->ipipe_bsc = 2;
+ }
+ 
+ static unsigned int ipipe_rsz_chain_state(void)
+@@ -2265,6 +2282,81 @@
+ 	return 0;
+ }
+ 
++static int validate_bsc_params(struct device *dev)
++{
++#ifdef CONFIG_IPIPE_PARAM_VALIDATION
++	if (bsc.en > 1 || bsc.mode > 1 || bsc.col_en > 1 || bsc.row_en >1 )
++	    return -1;
++
++	if (bsc.row_vct > BSC_VCT_MASK ||
++	    bsc.row_shf > BSC_SHF_MASK ||
++	    bsc.row_vpos > BSC_POS_MASK ||
++	    bsc.row_vnum > BSC_NUM_MASK ||
++	    bsc.row_vskip > BSC_SKIP_MASK ||
++	    bsc.row_hpos > BSC_POS_MASK ||
++	    bsc.row_hnum > BSC_NUM_MASK ||
++	    bsc.row_hskip > BSC_SKIP_MASK ||
++	    bsc.col_vct > BSC_VCT_MASK ||
++	    bsc.col_shf > BSC_SHF_MASK ||
++	    bsc.col_vpos > BSC_POS_MASK ||
++	    bsc.col_vnum > BSC_NUM_MASK ||
++	    bsc.col_vskip > BSC_SKIP_MASK ||
++	    bsc.col_hpos > BSC_POS_MASK ||
++	    bsc.col_hnum > BSC_NUM_MASK ||
++	    bsc.col_hskip > BSC_SKIP_MASK)
++		return -1;
++	if (bsc.y_cb_cr > IPIPE_BSC_IN_CR)
++	    return -1;
++#endif
++	return 0;
++}
++
++static int set_bsc_params(struct device *dev, void *param, int len)
++{
++	struct prev_bsc *bsc_param = (struct prev_bsc *)param;
++	if (ISNULL(bsc_param)) {
++		/* Copy defaults for ns */
++		memcpy((void *)&bsc,
++		       (void *)&dm365_bsc_defaults,
++		       sizeof(struct prev_bsc));
++	} else {
++		if (len != sizeof(struct prev_bsc)) {
++			dev_err(dev,
++				"set_bsc_params: param struct"
++				" length mismatch\n");
++			return -EINVAL;
++		}
++		if (copy_from_user(&bsc, bsc_param, sizeof(struct prev_bsc))) {
++			dev_err(dev,
++				"set_bsc_params: Error in copy from user\n");
++			return -EFAULT;
++		}
++		if (validate_bsc_params(dev) < 0)
++			return -EINVAL;
++	}
++	return ipipe_set_bsc_regs(&bsc);
++}
++static int get_bsc_params(struct device *dev, void *param, int len)
++{
++	struct prev_bsc *bsc_param = (struct prev_bsc *)param;
++
++	if (ISNULL(bsc_param)) {
++		dev_err(dev, "get_bsc_params: invalid user ptr");
++		return -EINVAL;
++	}
++	if (len != sizeof(struct prev_bsc)) {
++		dev_err(dev,
++			"get_bsc_params: param struct"
++			" length mismatch\n");
++		return -EINVAL;
++	}
++	if (copy_to_user(bsc_param, &bsc, sizeof(struct prev_bsc))) {
++		dev_err(dev, "get_bsc_params: Error in copy from kernel\n");
++		return -EFAULT;
++	}
++	return 0;
++}
++
+ static struct prev_module_if *prev_enum_preview_cap(struct device *dev,
+ 						    int index)
+ {
+@@ -2275,6 +2367,11 @@
+ 	return &prev_modules[index];
+ }
+ 
++static unsigned int bsc_get_state(void)
++{
++	return ((bsc.en & bsc.col_en) | (bsc.en & bsc.row_en));
++}
++
+ static unsigned int prev_get_oper_mode(void)
+ {
+ 	return oper_mode;
+@@ -3978,6 +4075,10 @@
+ 	memcpy(&dm365_ipipe_defs.ipipeif_param.var.if_5_1,
+ 		&ipipeif_5_1_defaults,
+ 		sizeof(struct ipipeif_5_1));
++	/*Making bsc tables visible to kernel, getting virtual address*/
++	dm365_ipipe_interface.bsc_tb_ptr = ioremap(IPIPE_BSC_TB0,
++	    IPIPE_BSC_TB_SIZE);
++	memset(dm365_ipipe_interface.bsc_tb_ptr, 0, 0x4000);
+ 	lutdpc.table = ipipe_lutdpc_table;
+ 	lut_3d.table = ipipe_3d_lut_table;
+ 	gbce.table = ipipe_gbce_table;
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_common.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_common.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_common.h
+@@ -240,6 +240,7 @@
+ struct irq_numbers {
+ 	int sdram;
+ 	int update;
++	int ipipe_bsc;
+ };
+ 
+ /* IMP channel structure */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.h
+@@ -51,6 +51,10 @@
+ #define D3L_TB2_START_ADDR	(0xA000)
+ #define D3L_TB3_START_ADDR	(0xA400)
+ 
++/* RAM table for bsc vectors*/
++#define IPIPE_BSC_TB0		(0x1C74000)
++#define IPIPE_BSC_TB1		(0x6000)
++#define IPIPE_BSC_TB_SIZE	(0x4000)
+ /* IPIPE Register Offsets from the base address */
+ #define IPIPE_SRC_EN 		(0x0000)
+ #define IPIPE_SRC_MODE 		(0x0004)
+@@ -255,6 +259,27 @@
+ #define CGS_GN2_L_SHF		(0x378)
+ #define CGS_GN2_L_MIN		(0x37C)
+ 
++/* Boundary Signal Calculator */
++#define BSC_EN  			(0x400)
++#define BSC_MODE	  		(0x404)
++#define BSC_TYP  			(0x408)
++#define BSC_ROW_VCT  		(0x40C)
++#define BSC_ROW_SHF  		(0x410)
++#define BSC_ROW_VPOS  		(0x414)
++#define BSC_ROW_VNUM  		(0x418)
++#define BSC_ROW_VSKIP  		(0x41C)
++#define BSC_ROW_HPOS  		(0x420)
++#define BSC_ROW_HNUM  		(0x424)
++#define BSC_ROW_HSKIP  		(0x428)
++#define BSC_COL_VCT  		(0x42C)
++#define BSC_COL_SHF  		(0x430)
++#define BSC_COL_VPOS  		(0x434)
++#define BSC_COL_VNUM  		(0x438)
++#define BSC_COL_VSKIP  		(0x43C)
++#define BSC_COL_HPOS  		(0x440)
++#define BSC_COL_HNUM  		(0x444)
++#define BSC_COL_HSKIP  		(0x448)
++
+ /* Resizer */
+ #define RSZ_SRC_EN		(0x0)
+ #define RSZ_SRC_MODE		(0x4)
+@@ -466,6 +491,16 @@
+ /* CGS */
+ #define CAR_SHIFT_MASK			(3)
+ 
++/* Boundary Signal Calculator */
++#define BSC_CEN_SHIFT	(3)
++#define BSC_REN_SHIFT	(2)
++#define BSC_COL_MASK	(0x3)
++#define BSC_VCT_MASK	(0x3)
++#define BSC_SHF_MASK	(0x7)
++#define BSC_POS_MASK	(0xFFF)
++#define BSC_NUM_MASK	(0xFFF)
++#define BSC_SKIP_MASK	(0x1F)
++
+ /* Resizer */
+ #define RSZ_BYPASS_SHIFT		(1)
+ #define RSZ_SRC_IMG_FMT_SHIFT		(1)
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/dm365_ipipe.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/dm365_ipipe.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/dm365_ipipe.h
+@@ -122,8 +122,10 @@
+ #define PREV_CGS		17
+ /* Global brighness and contrast control */
+ #define PREV_GBCE		18
++/* Boundary Signal Calculator */
++#define PREV_BSC		19
+ /* Last module ID */
+-#define PREV_MAX_MODULES	18
++#define PREV_MAX_MODULES	19
+ 
+ struct ipipe_float_u16 {
+ 	unsigned short integer;
+@@ -695,6 +697,43 @@
+ 	unsigned char h_min;
+ };
+ 
++enum ipipe_bsc_input{
++	IPIPE_BSC_IN_Y,
++	IPIPE_BSC_IN_CB,
++	IPIPE_BSC_IN_CR
++};
++/* structure for Boundary Signal Calculator */
++struct prev_bsc {
++	/* enable/disable */
++	unsigned char en;
++
++	unsigned char mode;
++	unsigned char col_en;
++	unsigned char row_en;
++	enum ipipe_bsc_input y_cb_cr;
++
++	unsigned int row_vct;
++	unsigned int row_shf;
++	unsigned int row_vpos;
++	unsigned int row_vnum;
++	unsigned int row_vskip;
++	unsigned int row_hpos;
++	unsigned int row_hnum;
++	unsigned int row_hskip;
++
++	unsigned int col_vct;
++	unsigned int col_shf;
++	unsigned int col_vpos;
++	unsigned int col_vnum;
++	unsigned int col_vskip;
++	unsigned int col_hpos;
++	unsigned int col_hnum;
++	unsigned int col_hskip;
++
++	void* tb_ptr;
++
++};
++
+ /* various pixel formats supported */
+ enum ipipe_pix_formats {
+ 	IPIPE_BAYER_8BIT_PACK,
+@@ -1347,6 +1386,7 @@
+ int ipipe_set_ee_regs(struct prev_yee *ee);
+ int ipipe_set_car_regs(struct prev_car *car);
+ int ipipe_set_cgs_regs(struct prev_cgs *cgs);
++int ipipe_set_bsc_regs(struct prev_bsc *bsc);
+ int rsz_enable(int rsz_id, int enable);
+ void rsz_src_enable(int enable);
+ int rsz_set_output_address(struct ipipe_params *params,
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe_hw.c
+@@ -1171,6 +1171,41 @@
+ 	return 0;
+ }
+ 
++/* Boundary Signal Calculation */
++int ipipe_set_bsc_regs(struct prev_bsc *bsc)
++{
++	u32 utemp;
++
++	ipipe_clock_enable();
++	regw_ip(bsc->en, BSC_EN);
++	if (bsc->en) {
++		/* Set the acquisition parameters */
++		regw_ip(bsc->mode,		BSC_MODE);
++		utemp = bsc->y_cb_cr & BSC_COL_MASK;
++		utemp |= (bsc->col_en << BSC_CEN_SHIFT);
++		utemp |= (bsc->row_en << BSC_REN_SHIFT);
++		regw_ip(utemp, 		BSC_TYP);
++		regw_ip(bsc->row_vct & BSC_VCT_MASK, 	BSC_ROW_VCT);
++		regw_ip(bsc->row_shf & BSC_SHF_MASK, 	BSC_ROW_SHF);
++		regw_ip(bsc->row_vpos & BSC_POS_MASK, 	BSC_ROW_VPOS);
++		regw_ip(bsc->row_vnum & BSC_NUM_MASK, 	BSC_ROW_VNUM);
++		regw_ip(bsc->row_vskip & BSC_SKIP_MASK,	BSC_ROW_VSKIP);
++		regw_ip(bsc->row_hpos & BSC_POS_MASK, 	BSC_ROW_HPOS);
++		regw_ip(bsc->row_hnum & BSC_NUM_MASK, 	BSC_ROW_HNUM);
++		regw_ip(bsc->row_hskip & BSC_SKIP_MASK,	BSC_ROW_HSKIP);
++
++		regw_ip(bsc->col_vct & BSC_VCT_MASK, 	BSC_COL_VCT);
++		regw_ip(bsc->col_shf & BSC_SHF_MASK, 	BSC_COL_SHF);
++		regw_ip(bsc->col_vpos & BSC_POS_MASK, 	BSC_COL_VPOS);
++		regw_ip(bsc->col_vnum & BSC_NUM_MASK, 	BSC_COL_VNUM);
++		regw_ip(bsc->col_vskip & BSC_SKIP_MASK,	BSC_COL_VSKIP);
++		regw_ip(bsc->col_hpos & BSC_POS_MASK,	BSC_COL_HPOS);
++		regw_ip(bsc->col_hnum & BSC_NUM_MASK, 	BSC_COL_HNUM);
++		regw_ip(bsc->col_hskip & BSC_SKIP_MASK,	BSC_COL_HSKIP);
++	}
++	return 0;
++}
++
+ void rsz_src_enable(int enable)
+ {
+ 	regw_rsz(enable, RSZ_SRC_EN);
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.h
+@@ -15,6 +15,7 @@
+ extern struct prev_yee dm365_yee_defaults;
+ extern struct prev_car dm365_car_defaults;
+ extern struct prev_cgs dm365_cgs_defaults;
++extern struct prev_bsc dm365_bsc_defaults;
+ extern struct ipipe_params dm365_ipipe_defs;
+ extern struct prev_single_shot_config dm365_prev_ss_config_defs;
+ extern struct prev_continuous_config dm365_prev_cont_config_defs;
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.c
+@@ -142,6 +142,10 @@
+ 	.en = 0,
+ };
+ 
++struct prev_bsc dm365_bsc_defaults = {
++	.en = 0,
++};
++
+ #define  WIDTH_I 640
+ #define  HEIGHT_I 480
+ #define  WIDTH_O 640
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_hw_if.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_hw_if.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/imp_hw_if.h
+@@ -50,6 +50,8 @@
+ 	 */
+ 	struct prev_module_if *(*prev_enum_modules) (struct device *dev,
+ 						     int index);
++	unsigned int (*get_bsc_state) (void);
++	void* bsc_tb_ptr;
+ 	/*
+ 	 *  get preview operation mode
+ 	 */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h
++++ kernel/linux-2.6.32.17-psp03.01.01.39/include/media/davinci/vpfe_capture.h
+@@ -43,6 +43,10 @@
+ 
+ #define CAPTURE_DRV_NAME		"vpfe-capture"
+ 
++//comment to remove print messages by dev_notice()
++#define V4L2_INFO
++
++
+ struct vpfe_pixel_format {
+ 	struct v4l2_fmtdesc fmtdesc;
+ 	/* bytes per pixel */
+@@ -173,6 +177,8 @@
+ 	unsigned int imp_dma_irq;
+ 	/* IRQ number for Update resizer imp registers */
+ 	unsigned int imp_update_irq;
++	/* IRQ number for bsc calculation completion */
++	unsigned int imp_bsc_irq;
+ 	/* CCDC IRQs used when CCDC/ISIF output to SDRAM */
+ 	unsigned int ccdc_irq0;
+ 	unsigned int ccdc_irq1;
+@@ -215,6 +221,9 @@
+ 	 * buffer for field seperated YCbCr formats
+ 	 */
+ 	u32 field_off;
++
++	unsigned char buffer_complete;
++	unsigned char bsc_ready;
+ };
+ 
+ /* File handle structure */
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/media/video/mt9p031.c
+@@ -164,6 +164,14 @@
+     .num_frmivals = 1
+     },
+     {
++    /* 120% of VGA for video stabilization*/
++    .framesize = { 768, 576 },
++    .frameintervals = {
++        { .numerator =1, .denominator = 30 },
++        },
++    .num_frmivals = 1
++    },
++    {
+     /* SVGA-2X Binning+Skipping */
+     .framesize = { 800, 600 },
+     .frameintervals = {
+@@ -188,6 +196,14 @@
+     .num_frmivals = 1
+     },
+     {
++    /* 120% of 720P for video stabilization*/
++    .framesize = { 1536, 864 },
++    .frameintervals = {
++        { .numerator =1, .denominator = 23 },
++        },
++    .num_frmivals = 1
++    },
++    {
+     /* SXGA */
+     .framesize = { 1280, 1024},
+     .frameintervals = {

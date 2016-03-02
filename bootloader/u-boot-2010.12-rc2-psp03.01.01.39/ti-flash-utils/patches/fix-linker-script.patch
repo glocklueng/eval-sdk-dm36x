@@ -1,0 +1,43 @@
+Index: ti-flash-utils/src/DM36x/GNU/ubl/ubl.lds
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/GNU/ubl/ubl.lds	2013-08-19 13:29:26.307496325 -0600
++++ ti-flash-utils/src/DM36x/GNU/ubl/ubl.lds	2013-08-19 14:31:51.955464816 -0600
+@@ -25,7 +25,12 @@
+   __selfcopydest = DRAMStart + 0x00000020;
+   
+   /* Self copy code is in first 256-32=224 bytes of image */
+-  .selfcopy : AT (0x0)
++  .note.gnu.build-id : AT (0x0)
++  {
++    *(.note.gnu.build-id)
++    . = ALIGN(4);
++  }
++  .selfcopy : AT ( LOADADDR(.note.gnu.build-id) + SIZEOF(.note.gnu.build-id))
+   {
+     *(.selfcopy)    
+     . = 0xE0;
+@@ -38,15 +43,22 @@
+     *(.boot)
+     . = ALIGN(4);
+   }
+-  .text    : AT ( LOADADDR(.boot) + SIZEOF(.boot) )
++  .text    : /* AT ( LOADADDR(.boot) + SIZEOF(.boot) ) */
+   {
+     *(.text)
+     . = ALIGN(4);
+   }
++
++  .text.startup    : AT ( LOADADDR(.text) + SIZEOF(.text) )
++  {
++    *(.text.startup)
++    . = ALIGN(4);
++  }
++
+   
+   /* Move into DRAM for placing const and data sections */
+   . += (DRAMStart - IRAMStart);
+-  .rodata    : AT ( LOADADDR(.text) + SIZEOF(.text) )
++  .rodata    : AT ( LOADADDR(.text.startup) + SIZEOF(.text.startup) )
+   {
+     *(.rodata*)
+     *(.rodata)

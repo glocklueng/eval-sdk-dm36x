@@ -1,0 +1,28 @@
+Index: gst-dmai-plugins/src/src/gsttividenc1.c
+===================================================================
+--- gst-dmai-plugins.orig/src/src/gsttividenc1.c	2014-03-27 17:46:01.000000000 -0600
++++ gst-dmai-plugins/src/src/gsttividenc1.c	2014-06-12 11:50:45.229493600 -0600
+@@ -252,15 +252,19 @@
+ 
+     params->maxWidth = dynParams->inputWidth = dmaienc->width;
+     params->maxHeight = dynParams->inputHeight = dmaienc->height;
+-#if PLATFORM != dm365
+-    /* Looks like the some current codecs (i.e. DM365 h264) get mad about
+-       setting this parameters */
++
+     dynParams->refFrameRate = dynParams->targetFrameRate = 
+         (dmaienc->framerateNum * 1000) / dmaienc->framerateDen;
+-#endif
++
+     if (dmaienc->pitch) {
+         dynParams->captureWidth = dmaienc->pitch;
+     }
++
++    /* If the codec already exists and codec is setting its caps means
++       that a caps renegotiation is taking place, i.e.: framerate changed.
++       Time to reconfigure codec's dynamic parameters */
++    if (dmaienc->hCodec)
++      gstti_videnc1_set_dynamic_params(dmaienc);
+ }
+ 
+ static void gstti_videnc1_flush (GstTIDmaienc *dmaienc)

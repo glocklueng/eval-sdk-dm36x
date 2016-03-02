@@ -1,0 +1,41 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c	2011-04-27 09:18:03.068716088 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_ipipe.c	2011-04-28 08:48:04.859971190 -0600
+@@ -450,7 +450,7 @@
+ 	.alloc_config_block = ipipe_alloc_config_block,
+ 	.dealloc_config_block = ipipe_dealloc_config_block,
+ 	.alloc_user_config_block = ipipe_alloc_user_config_block,
+-	.dealloc_config_block = ipipe_dealloc_user_config_block,
++	.dealloc_user_config_block = ipipe_dealloc_user_config_block,
+ 	.set_user_config_defaults = ipipe_set_user_config_defaults,
+ 	.set_preview_config = ipipe_set_preview_config,
+ 	.set_resizer_config = ipipe_set_resize_config,
+@@ -3708,7 +3708,7 @@
+ {
+ 	int ret = 0;
+ 	struct ipipe_params *param = (struct ipipe_params *)config;
+-	dev_err(dev, "ipipe_set_preview_config\n");
++	dev_dbg(dev, "ipipe_set_preview_config\n");
+ 
+ 	if ((ISNULL(user_config)) || (ISNULL(config))) {
+ 		dev_err(dev, "Invalid user_config or config ptr\n");
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.c	2011-06-27 13:42:16.071464838 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/char/dm365_def_para.c	2011-06-27 13:42:43.815974632 -0600
+@@ -357,10 +357,10 @@
+ 		.avg_filter_en = AVG_OFF,
+ 		.gain = 512,
+ 		.clip = 4095,
+-		.colp_olop = IPIPE_GREEN_BLUE,
+-		.colp_olep = IPIPE_BLUE,
+-		.colp_elop = IPIPE_RED,
+-		.colp_elep = IPIPE_GREEN_RED
++		.colp_olop = IPIPE_GREEN_RED,
++		.colp_olep = IPIPE_RED,
++		.colp_elop = IPIPE_BLUE,
++		.colp_elep = IPIPE_GREEN_BLUE
+ 	},
+ };
+ 

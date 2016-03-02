@@ -1,0 +1,153 @@
+Index: gst-plugins-good-0.10.25/src/sys/v4l2/v4l2src_calls.c
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/sys/v4l2/v4l2src_calls.c	2014-07-30 14:51:41.996257893 -0600
++++ gst-plugins-good-0.10.25/src/sys/v4l2/v4l2src_calls.c	2014-08-05 13:48:40.349393863 -0600
+@@ -364,6 +364,61 @@
+ }
+ 
+ /******************************************************
++ * gst_v4l2src_set_framerate():
++ *   set capture framerate parameter
++ * return value: TRUE on success, FALSE on error
++ ******************************************************/
++gboolean
++gst_v4l2src_set_framerate (GstV4l2Src * v4l2src, guint fps_n, guint fps_d)
++{
++  gint fd = v4l2src->v4l2object->video_fd;
++  struct v4l2_streamparm stream;
++
++  GST_LOG_OBJECT (v4l2src, "Desired framerate: %u/%u", fps_n, fps_d);
++
++  memset (&stream, 0x00, sizeof (struct v4l2_streamparm));
++  stream.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
++  if (v4l2_ioctl (fd, VIDIOC_G_PARM, &stream) < 0) {
++    GST_ELEMENT_WARNING (v4l2src, RESOURCE, SETTINGS,
++        (_("Could not get parameters on device '%s'"),
++            v4l2src->v4l2object->videodev), GST_ERROR_SYSTEM);
++    goto done;
++  }
++
++  GST_LOG_OBJECT (v4l2src, "Setting framerate to %u/%u", fps_n, fps_d);
++
++  /* Note: V4L2 wants the frame interval, we have the frame rate */
++  stream.parm.capture.timeperframe.numerator = fps_d;
++  stream.parm.capture.timeperframe.denominator = fps_n;
++
++  /* some cheap USB cam's won't accept any change */
++  if (v4l2_ioctl (fd, VIDIOC_S_PARM, &stream) < 0) {
++    GST_ELEMENT_WARNING (v4l2src, RESOURCE, SETTINGS,
++        (_("Video input device did not accept new frame rate setting.")),
++        GST_ERROR_SYSTEM);
++    goto done;
++  }
++
++  v4l2src->fps_n = fps_n;
++  v4l2src->fps_d = fps_d;
++
++  /* if we have a framerate pre-calculate duration */
++  if (fps_n > 0 && fps_d > 0) {
++    v4l2src->duration = gst_util_uint64_scale_int (GST_SECOND, fps_d, fps_n);
++  } else {
++    v4l2src->duration = GST_CLOCK_TIME_NONE;
++  }
++
++  GST_INFO_OBJECT (v4l2src,
++      "Set framerate to %u/%u and duration to %" GST_TIME_FORMAT, fps_n, fps_d,
++      GST_TIME_ARGS (v4l2src->duration));
++
++done:
++
++  return TRUE;
++}
++
++/******************************************************
+  * gst_v4l2src_capture_init():
+  *   initialize the capture system
+  * return value: TRUE on success, FALSE on error
+Index: gst-plugins-good-0.10.25/src/sys/v4l2/gstv4l2src.c
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/sys/v4l2/gstv4l2src.c	2014-07-30 14:51:41.996257893 -0600
++++ gst-plugins-good-0.10.25/src/sys/v4l2/gstv4l2src.c	2014-08-06 13:51:22.707026103 -0600
+@@ -679,6 +679,7 @@
+   struct v4l2_fmtdesc *format;
+   guint fps_n, fps_d;
+   guint size;
++  GstCaps *current_caps = NULL;
+ 
+   v4l2src = GST_V4L2SRC (src);
+ 
+@@ -686,6 +687,35 @@
+   if (!GST_V4L2_IS_OPEN (v4l2src->v4l2object))
+     return FALSE;
+ 
++  /* we want our own v4l2 type of fourcc codes */
++  if (!gst_v4l2_object_get_caps_info (v4l2src->v4l2object, caps, &format, &w,
++          &h, &fps_n, &fps_d, &size)) {
++    GST_DEBUG_OBJECT (v4l2src,
++        "can't get capture format from caps %" GST_PTR_FORMAT, caps);
++    return FALSE;
++  }
++
++  current_caps = gst_pad_get_negotiated_caps(GST_BASE_SRC_PAD (src));
++  if (current_caps != NULL){
++	  gint c_w = 0, c_h = 0;
++	  guint c_fps_n, c_fps_d;
++	  struct v4l2_fmtdesc *c_format;
++	  guint c_size;
++	  if (!gst_v4l2_object_get_caps_info (v4l2src->v4l2object, current_caps, &c_format, &c_w,
++		&c_h, &c_fps_n, &c_fps_d, &c_size)) {
++			GST_WARNING_OBJECT (v4l2src,
++				"can't get capture format from current negotiated caps %" GST_PTR_FORMAT, current_caps);
++			return FALSE;
++	  }
++	  if (w == c_w && h == c_h && (fps_n != c_fps_n || fps_d != c_fps_d)){
++		  if (gst_v4l2src_set_framerate (v4l2src, fps_n, fps_d))
++			return TRUE;
++		  else
++			/* error already posted */
++			return FALSE;
++	  }
++  }
++
+   /* make sure we stop capturing and dealloc buffers */
+   if (GST_V4L2_IS_ACTIVE (v4l2src->v4l2object)) {
+     /* both will throw an element-error on failure */
+@@ -695,21 +725,13 @@
+       return FALSE;
+   }
+ 
+-  /* we want our own v4l2 type of fourcc codes */
+-  if (!gst_v4l2_object_get_caps_info (v4l2src->v4l2object, caps, &format, &w,
+-          &h, &fps_n, &fps_d, &size)) {
+-    GST_DEBUG_OBJECT (v4l2src,
+-        "can't get capture format from caps %" GST_PTR_FORMAT, caps);
+-    return FALSE;
+-  }
+-
+   GST_DEBUG_OBJECT (v4l2src, "trying to set_capture %dx%d at %d/%d fps, "
+-      "format %s", w, h, fps_n, fps_d, format->description);
++	"format %s", w, h, fps_n, fps_d, format->description);
+ 
+   if (!gst_v4l2src_set_capture (v4l2src, format->pixelformat, w, h, fps_n,
+-          fps_d))
+-    /* error already posted */
+-    return FALSE;
++	fps_d))
++	/* error already posted */
++	return FALSE;
+ 
+   if (!gst_v4l2src_capture_init (v4l2src, caps))
+     return FALSE;
+Index: gst-plugins-good-0.10.25/src/sys/v4l2/v4l2src_calls.h
+===================================================================
+--- gst-plugins-good-0.10.25.orig/src/sys/v4l2/v4l2src_calls.h	2014-07-30 14:51:41.996257893 -0600
++++ gst-plugins-good-0.10.25/src/sys/v4l2/v4l2src_calls.h	2014-08-05 11:44:34.561394765 -0600
+@@ -32,6 +32,8 @@
+                                           guint32 pixelformat,
+                                           guint32 width, guint32 height,
+ 				          guint32 fps_n, guint32 fps_d);
++gboolean   gst_v4l2src_set_framerate     (GstV4l2Src * v4l2src,
++				          guint32 fps_n, guint32 fps_d);
+ 
+ gboolean   gst_v4l2src_capture_init      (GstV4l2Src * v4l2src, GstCaps *caps);
+ gboolean   gst_v4l2src_capture_start     (GstV4l2Src * v4l2src);

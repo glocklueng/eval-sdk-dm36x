@@ -1,0 +1,31 @@
+#
+# Ridgerun BSP Configuration file for DM368 LeopardBoard
+#
+
+config BSP_ARCH_DM368
+	bool
+	default y
+
+config BSP_DM368_LEOPARD
+       bool
+       default y
+
+config BSP_VIDEO_OUTPUT_DVI_SUPPORTED
+	bool
+	default y
+
+config BSP_NET_HAS_ETH0
+	bool
+	depends on TI_DAVINCI_EMAC
+	select BSP_NET_HAS_NET
+	default y
+
+config BSP_NAND_BLOCK_SIZE
+	depends on UBOOT_NAND_FLASH_MEMORY
+	string "NAND block size"
+	default "131072"
+
+config BSP_NAND_PAGE_SIZE
+	depends on UBOOT_NAND_FLASH_MEMORY
+	string "NAND page size"
+	default "2048"

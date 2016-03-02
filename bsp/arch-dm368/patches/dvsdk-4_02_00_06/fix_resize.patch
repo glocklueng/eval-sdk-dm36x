@@ -1,0 +1,12 @@
+Index: dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/Resize.c
+===================================================================
+--- dvsdk-4_02_00_06.orig/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/Resize.c	2011-10-19 11:16:29.888538762 -0600
++++ dvsdk-4_02_00_06/dvsdk/dmai_2_20_00_15/packages/ti/sdo/dmai/linux/dm365/Resize.c	2011-10-19 11:16:54.328584437 -0600
+@@ -251,6 +251,7 @@
+     /* input params are set at the resizer */
+     rsz_ss_config.input.image_width  = srcDim.width;
+     rsz_ss_config.input.image_height = srcDim.height;
++    rsz_ss_config.input.line_length = srcDim.lineLength;
+     rsz_ss_config.input.ppln = rsz_ss_config.input.image_width + 8;
+     rsz_ss_config.input.lpfr = rsz_ss_config.input.image_height + 10;
+     rsz_ss_config.input.pix_fmt = pixFormatConversion(BufferGfx_getColorSpace(hSrcBuf));

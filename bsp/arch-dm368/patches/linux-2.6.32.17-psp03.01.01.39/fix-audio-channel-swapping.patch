@@ -1,0 +1,43 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-i2s.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-i2s.c	2011-03-24 18:27:36.000000000 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/sound/soc/davinci/davinci-i2s.c	2014-08-11 14:29:57.260126756 -0600
+@@ -418,10 +418,7 @@
+ 	struct davinci_mcbsp_dev *dev = dai->private_data;
+ 	int playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
+ 	davinci_mcbsp_stop(dev, playback);
+-	if ((dev->pcr & DAVINCI_MCBSP_PCR_FSXM) == 0) {
+-		/* codec is master */
+-		davinci_mcbsp_start(dev, substream);
+-	}
++
+ 	return 0;
+ }
+ 
+@@ -431,8 +428,6 @@
+ 	struct davinci_mcbsp_dev *dev = dai->private_data;
+ 	int ret = 0;
+ 	int playback = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
+-	if ((dev->pcr & DAVINCI_MCBSP_PCR_FSXM) == 0)
+-		return 0;	/* return if codec is master */
+ 
+ 	switch (cmd) {
+ 	case SNDRV_PCM_TRIGGER_START:
+@@ -539,7 +539,7 @@
+ 	}
+ 	dev->dma_params[SNDRV_PCM_STREAM_PLAYBACK].channel = res->start;
+ 	dev->dma_params[SNDRV_PCM_STREAM_PLAYBACK].eventq_no =
+-					pdata ? pdata->eventq_no : EVENTQ_0;
++					pdata ? pdata->eventq_no : EVENTQ_3;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_DMA, 1);
+ 	if (!res) {
+@@ -548,6 +548,8 @@
+ 		goto err_free_mem;
+ 	}
+ 	dev->dma_params[SNDRV_PCM_STREAM_CAPTURE].channel = res->start;
++	dev->dma_params[SNDRV_PCM_STREAM_CAPTURE].eventq_no =
++					pdata ? pdata->eventq_no : EVENTQ_3;
+ 
+ 	davinci_i2s_dai.private_data = dev;
+ 	ret = snd_soc_register_dai(&davinci_i2s_dai);

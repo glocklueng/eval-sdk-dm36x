@@ -1,0 +1,13 @@
+Index: ti-flash-utils/src/DM36x/GNU/ubl/build/makefile
+===================================================================
+--- ti-flash-utils.orig/src/DM36x/GNU/ubl/build/makefile	2013-08-12 09:25:12.342553548 -0600
++++ ti-flash-utils/src/DM36x/GNU/ubl/build/makefile	2013-08-12 09:26:06.586553755 -0600
+@@ -22,7 +22,7 @@
+ ASSEMBLY=../../../../Common/arch/arm926ejs/_udivsi3.S ../../../../Common/arch/arm926ejs/_divsi3.S
+ ENTRYPOINT=boot
+ 
+-CFLAGS:=-DPLL_SETTING_$(PLL_SETTING) -c -Os -Wall -ffreestanding -I../../../Common/include -I../../../../Common/include -I../../../../Common/arch/arm926ejs/include -I../../../../Common/$(PROGRAM)/include -I../../../../Common/drivers/include -I../../../../Common/gnu/include 
++CFLAGS:=-DPLL_SETTING_$(PLL_SETTING) -c -Os -Wall $(BFLAGS) -ffreestanding -I../../../Common/include -I../../../../Common/include -I../../../../Common/arch/arm926ejs/include -I../../../../Common/$(PROGRAM)/include -I../../../../Common/drivers/include -I../../../../Common/gnu/include 
+ ifeq ($(TYPE),nand)
+ 	CFLAGS+= -DUBL_NAND
+   SOURCES+= nand.c nandboot.c device_nand.c

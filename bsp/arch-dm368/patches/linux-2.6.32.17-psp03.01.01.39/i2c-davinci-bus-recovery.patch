@@ -1,0 +1,115 @@
+Index: kernel/linux-2.6.32.17-psp03.01.01.39/drivers/i2c/busses/i2c-davinci.c
+===================================================================
+--- kernel.orig/linux-2.6.32.17-psp03.01.01.39/drivers/i2c/busses/i2c-davinci.c	2014-04-22 16:50:54.416940916 -0600
++++ kernel/linux-2.6.32.17-psp03.01.01.39/drivers/i2c/busses/i2c-davinci.c	2014-04-22 16:58:07.528933160 -0600
+@@ -68,6 +68,10 @@
+ #define DAVINCI_I2C_IVR_REG	0x28
+ #define DAVINCI_I2C_EMDR_REG	0x2c
+ #define DAVINCI_I2C_PSC_REG	0x30
++#define DAVINCI_I2C_FUNC_REG	0x48
++#define DAVINCI_I2C_DIR_REG	0x4c
++#define DAVINCI_I2C_DIN_REG	0x50
++#define DAVINCI_I2C_DOUT_REG	0x54
+ 
+ #define DAVINCI_I2C_IVR_AAS	0x07
+ #define DAVINCI_I2C_IVR_SCD	0x06
+@@ -166,27 +170,7 @@
+ 	}
+ }
+ 
+-/* This routine does i2c bus recovery as specified in the
+- * i2c protocol Rev. 03 section 3.16 titled "Bus clear"
+- */
+-static void i2c_recover_bus(struct davinci_i2c_dev *dev)
+-{
+-	u32 flag = 0;
+-	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
+ 
+-	dev_err(dev->dev, "initiating i2c bus recovery\n");
+-	/* Send NACK to the slave */
+-	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+-	flag |=  DAVINCI_I2C_MDR_NACK;
+-	/* write the data into mode register */
+-	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, flag);
+-	if (pdata)
+-		generic_i2c_clock_pulse(pdata->scl_pin);
+-	/* Send STOP */
+-	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_MDR_REG);
+-	flag |= DAVINCI_I2C_MDR_STP;
+-	davinci_i2c_write_reg(dev, DAVINCI_I2C_MDR_REG, flag);
+-}
+ 
+ static inline void davinci_i2c_reset_ctrl(struct davinci_i2c_dev *i2c_dev,
+ 								int val)
+@@ -286,6 +270,55 @@
+ 	return 0;
+ }
+ 
++/* This routine does i2c bus recovery as specified in the
++ * i2c protocol Rev. 03 section 3.16 titled "Bus clear"
++ */
++static void i2c_recover_bus(struct davinci_i2c_dev *dev)
++{
++	u32 flag = 0;
++	int i;
++	struct davinci_i2c_platform_data *pdata = dev->dev->platform_data;
++
++	flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_DIN_REG);
++	if ((flag & 0x01) == 0)
++	 dev_err(dev->dev, "SCL stuck at zero.\n");
++	dev_err(dev->dev, "initiating i2c bus recovery\n");
++
++	/* Disable interrupts */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_IMR_REG, 0);
++
++	/* put I2C into reset */
++	davinci_i2c_reset_ctrl(dev, 0);
++
++	/* Set GPIO mode */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_FUNC_REG, 0x1);
++
++	/* Set scl=1 sda=1 */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_DOUT_REG, 0x03);
++
++	/* Set SCL pin as output, SDA as input */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_DIR_REG, 0x1);
++
++	/* Send up to 9 clock pulses until SDA is high */
++	for (i = 0; i < 9; ++i) {
++		davinci_i2c_write_reg(dev, DAVINCI_I2C_DOUT_REG, 0x02); /* scl=0 sda=1 */
++		udelay(10);
++
++		davinci_i2c_write_reg(dev, DAVINCI_I2C_DOUT_REG, 0x03);
++		udelay(10);
++
++		/* Register DIN reads actual state on line */
++		flag = davinci_i2c_read_reg(dev, DAVINCI_I2C_DIN_REG);
++		if ((flag & 0x3) == 0x3) {
++			dev_info(dev->dev, "SDA and SCL high again (i=%d), resume.\n", i);
++		break;
++		}
++	}
++	/* Resume operation */
++	davinci_i2c_write_reg(dev, DAVINCI_I2C_FUNC_REG, 0x0);
++	i2c_davinci_init(dev);
++}
++
+ /*
+  * Waiting for bus not busy
+  */
+@@ -307,7 +340,6 @@
+ 			} else {
+ 				to_cnt = 0;
+ 				i2c_recover_bus(dev);
+-				i2c_davinci_init(dev);
+ 			}
+ 		}
+ 		if (allow_sleep)
+@@ -399,7 +431,6 @@
+ 	if (r == 0) {
+ 		dev_err(dev->dev, "controller timed out\n");
+ 		i2c_recover_bus(dev);
+-		i2c_davinci_init(dev);
+ 		dev->buf_len = 0;
+ 		return -ETIMEDOUT;
+ 	}

@@ -1,0 +1,62 @@
+Index: gst-dmai-plugins/src/src/gsttidmaienc.c
+===================================================================
+--- gst-dmai-plugins.orig/src/src/gsttidmaienc.c	2014-06-18 12:09:30.942060207 -0600
++++ gst-dmai-plugins/src/src/gsttidmaienc.c	2014-06-18 12:27:11.022058507 -0600
+@@ -266,6 +266,15 @@
+         g_free(dmaienc->stream_private);
+     }
+ 
++#ifdef GLIB_2_31_AND_UP
++    g_mutex_clear(&dmaienc->freeMutex);
++#else
++    if (dmaienc->freeMutex) {
++        g_mutex_free(dmaienc->freeMutex);
++        dmaienc->freeMutex = NULL;
++    }
++#endif
++
+     G_OBJECT_CLASS(g_type_class_peek_parent(G_OBJECT_GET_CLASS (object)))
+         ->finalize (object);
+ }
+@@ -403,9 +412,12 @@
+     dmaienc->adapter            = NULL;
+ 
+     dmaienc->freeSlices         = NULL;
+-#ifndef GLIB_2_31_AND_UP
+-    dmaienc->freeMutex          = NULL;
++#ifdef GLIB_2_31_AND_UP
++    g_mutex_init(&dmaienc->freeMutex);
++#else
++    dmaienc->freeMutex = g_mutex_new();
+ #endif
++
+     dmaienc->outBuf             = NULL;
+     dmaienc->inBuf              = NULL;
+     dmaienc->inBufSize          = 0;
+@@ -718,11 +730,6 @@
+     slice->start = 0;
+     slice->end = dmaienc->outBufSize;
+     slice->size = dmaienc->outBufSize;
+-#ifdef GLIB_2_31_AND_UP
+-    g_mutex_init(&dmaienc->freeMutex);
+-#else
+-    dmaienc->freeMutex = g_mutex_new();
+-#endif
+ 
+     dmaienc->freeSlices = g_list_append(dmaienc->freeSlices,slice);
+ 
+@@ -785,14 +792,6 @@
+     }
+ 
+     GMUTEX_UNLOCK(dmaienc->freeMutex);
+-#ifdef GLIB_2_31_AND_UP
+-    g_mutex_clear(&dmaienc->freeMutex);
+-#else
+-    if (dmaienc->freeMutex) {
+-        g_mutex_free(dmaienc->freeMutex);
+-        dmaienc->freeMutex = NULL;
+-    }
+-#endif
+ 
+     if (dmaienc->inBuf){
+         GST_DEBUG("freeing input buffer, %p\n",dmaienc->inBuf);
